@@ -1,0 +1,181 @@
+.history {
+  min-height: 100vh;
+  padding: 24rpx 0 40rpx;
+}
+
+// ---------- 统计条 ----------
+.stat-bar {
+  display: flex;
+  margin: 0 24rpx;
+  background: linear-gradient(135deg, #0f2b4c, #1b4680);
+  border-radius: 24rpx;
+  padding: 32rpx 0;
+  box-shadow: 0 12rpx 32rpx rgba(15, 43, 76, 0.25);
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  &__num {
+    color: #fff;
+    font-size: 44rpx;
+    font-weight: 700;
+  }
+
+  &__label {
+    margin-top: 6rpx;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 22rpx;
+  }
+}
+
+// ---------- 筛选 ----------
+.filter-bar {
+  margin-top: 28rpx;
+  white-space: nowrap;
+  padding: 0 24rpx;
+}
+
+.filter-chip {
+  display: inline-block;
+  padding: 12rpx 30rpx;
+  margin-right: 16rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: #5b6b82;
+  font-size: 25rpx;
+  border: 2rpx solid #e7ebf2;
+
+  &--active {
+    background: linear-gradient(135deg, #22579d, #0f2b4c);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 8rpx 20rpx rgba(15, 43, 76, 0.2);
+  }
+}
+
+// ---------- 列表 ----------
+.list {
+  padding: 0 24rpx;
+}
+
+.group {
+  margin-top: 28rpx;
+
+  &__date {
+    display: block;
+    font-size: 22rpx;
+    color: #8b98ab;
+    margin-bottom: 14rpx;
+    padding-left: 8rpx;
+  }
+}
+
+.item {
+  background: #fff;
+  border-radius: 22rpx;
+  padding: 26rpx 28rpx;
+  margin-bottom: 18rpx;
+  box-shadow: 0 6rpx 24rpx rgba(15, 43, 76, 0.05);
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__cat {
+    display: inline-flex;
+    align-items: center;
+    padding: 6rpx 18rpx;
+    border-radius: 999rpx;
+    font-size: 22rpx;
+    font-weight: 600;
+  }
+
+  &__dot {
+    width: 10rpx;
+    height: 10rpx;
+    border-radius: 50%;
+    margin-right: 10rpx;
+  }
+
+  &__summary {
+    display: block;
+    margin-top: 20rpx;
+    font-size: 28rpx;
+    color: #16233b;
+    line-height: 1.6;
+  }
+
+  &__bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 20rpx;
+  }
+
+  &__time {
+    font-size: 21rpx;
+    color: #a4aebb;
+  }
+
+  &__more {
+    display: flex;
+    align-items: center;
+  }
+
+  &__more-text {
+    font-size: 22rpx;
+    color: #1b4680;
+  }
+
+  &__arrow {
+    width: 24rpx;
+    height: 24rpx;
+    margin-left: 6rpx;
+  }
+}
+
+// ---------- 空状态 ----------
+.empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 0;
+
+  .empty-icon {
+    width: 160rpx;
+    height: 160rpx;
+    margin-bottom: 12rpx;
+  }
+
+  .empty-title {
+    color: #16233b;
+    font-size: 30rpx;
+    font-weight: 600;
+    margin-top: 8rpx;
+  }
+
+  .empty-text {
+    color: #8b98ab;
+    font-size: 25rpx;
+    margin-top: 10rpx;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .empty-btn {
+    margin-top: 32rpx;
+    height: 76rpx;
+    line-height: 76rpx;
+    padding: 0 52rpx;
+    border-radius: 38rpx;
+    background: linear-gradient(135deg, #22579d, #0f2b4c);
+    color: #fff;
+    font-size: 26rpx;
+  }
+}

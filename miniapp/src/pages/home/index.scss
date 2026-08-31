@@ -1,0 +1,678 @@
+.home {
+  min-height: 100vh;
+}
+
+// ---------- Hero ----------
+.hero {
+  position: relative;
+  background: linear-gradient(160deg, #0a1e38 0%, #0f2b4c 45%, #1b4680 100%);
+  padding: calc(env(safe-area-inset-top) + 90rpx) 40rpx 56rpx;
+  border-radius: 0 0 48rpx 48rpx;
+  overflow: hidden;
+  background-size: 180% 180%;
+  animation: heroShift 14s ease-in-out infinite;
+
+@keyframes heroShift {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+}
+  &::after {
+    content: '';
+    position: absolute;
+    right: -120rpx;
+    top: -80rpx;
+    width: 420rpx;
+    height: 420rpx;
+    border-radius: 50%;
+    border: 2rpx solid rgba(217, 188, 120, 0.25);
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    right: -40rpx;
+    top: 0;
+    width: 260rpx;
+    height: 260rpx;
+    border-radius: 50%;
+    border: 2rpx solid rgba(217, 188, 120, 0.18);
+  }
+
+  &__top {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__brand {
+    display: flex;
+    align-items: center;
+  }
+
+  &__logo {
+    width: 76rpx;
+    height: 76rpx;
+    border-radius: 22rpx;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2rpx solid rgba(217, 188, 120, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 20rpx;
+  }
+
+  &__logo-img {
+    width: 44rpx;
+    height: 44rpx;
+  }
+
+  &__name {
+    display: block;
+    color: #fff;
+    font-size: 34rpx;
+    font-weight: 700;
+    letter-spacing: 4rpx;
+    line-height: 1.3;
+  }
+
+  &__slogan {
+    display: block;
+    color: rgba(217, 188, 120, 0.9);
+    font-size: 21rpx;
+    letter-spacing: 2rpx;
+  }
+
+  &__title {
+    position: relative;
+    z-index: 2;
+    display: block;
+    margin-top: 48rpx;
+    color: #fff;
+    font-size: 56rpx;
+    font-weight: 700;
+    letter-spacing: 2rpx;
+  }
+
+  &__subtitle {
+    position: relative;
+    z-index: 2;
+    display: block;
+    margin-top: 12rpx;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 27rpx;
+  }
+}
+
+// ---------- 录音 ----------
+.record-zone {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 52rpx;
+}
+
+.record-btn {
+  width: 208rpx;
+  height: 208rpx;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #d9bc78, #b8923c);
+  box-shadow: 0 20rpx 52rpx rgba(184, 146, 60, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 8rpx solid rgba(255, 255, 255, 0.4);
+  transition: transform 0.15s ease;
+
+  &--active {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 24rpx rgba(217, 188, 120, 0.2), 0 20rpx 52rpx rgba(184, 146, 60, 0.55);
+    animation: pulse 1.2s ease infinite;
+  }
+
+  &__icon {
+    width: 96rpx;
+    height: 96rpx;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 188, 120, 0.35), 0 20rpx 52rpx rgba(184, 146, 60, 0.5); }
+  50% { box-shadow: 0 0 0 28rpx rgba(217, 188, 120, 0), 0 20rpx 52rpx rgba(184, 146, 60, 0.5); }
+}
+
+.record-timer {
+  display: flex;
+  align-items: center;
+  margin-top: 22rpx;
+  color: #fff;
+  font-size: 30rpx;
+  font-variant-numeric: tabular-nums;
+
+  &__dot {
+    width: 14rpx;
+    height: 14rpx;
+    border-radius: 50%;
+    background: #ff6b6b;
+    margin-right: 12rpx;
+    animation: blink 1s ease infinite;
+  }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.record-hint {
+  margin-top: 22rpx;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 26rpx;
+  letter-spacing: 1rpx;
+  font-weight: 500;
+}
+
+
+.hero__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14rpx;
+  margin-top: 26rpx;
+}
+
+.hero__chip {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2rpx solid rgba(217, 188, 120, 0.4);
+  border-radius: 999rpx;
+  padding: 10rpx 26rpx;
+
+  &-text {
+    font-size: 22rpx;
+    color: rgba(255, 255, 255, 0.88);
+  }
+}
+
+.demo-banner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  margin-top: 34rpx;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2rpx solid rgba(217, 188, 120, 0.35);
+  border-radius: 16rpx;
+  padding: 18rpx 24rpx;
+
+  &__dot {
+    width: 14rpx;
+    height: 14rpx;
+    border-radius: 50%;
+    background: #d9bc78;
+    margin-right: 14rpx;
+    flex-shrink: 0;
+  }
+
+  text {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 23rpx;
+    flex: 1;
+  }
+}
+
+// ---------- 紧凑流程条 ----------
+.flow-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 26rpx 24rpx 6rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 22rpx 16rpx;
+  box-shadow: 0 8rpx 28rpx rgba(15, 43, 76, 0.06);
+
+  &__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+  }
+
+  &__icon {
+    width: 64rpx;
+    height: 64rpx;
+    border-radius: 16rpx;
+    background: #f2f6fb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__img {
+    width: 36rpx;
+    height: 36rpx;
+  }
+
+  &__text {
+    margin-top: 8rpx;
+    font-size: 21rpx;
+    color: #5b6b82;
+  }
+
+  &__arrow {
+    width: 34rpx;
+    height: 2rpx;
+    background: #d5dce7;
+    margin: 0 6rpx 34rpx;
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: -3rpx;
+      width: 8rpx;
+      height: 8rpx;
+      border-top: 2rpx solid #d5dce7;
+      border-right: 2rpx solid #d5dce7;
+      transform: rotate(45deg);
+    }
+  }
+}
+
+// ---------- 快捷入口 ----------
+.entries {
+  display: flex;
+  gap: 20rpx;
+  padding: 0 24rpx;
+  margin-top: 30rpx;
+  position: relative;
+  z-index: 3;
+}
+
+.entry-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 26rpx 24rpx;
+  box-shadow: 0 10rpx 34rpx rgba(15, 43, 76, 0.1);
+
+  &__icon {
+    width: 76rpx;
+    height: 76rpx;
+    border-radius: 20rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 18rpx;
+    flex-shrink: 0;
+
+    &--blue {
+      background: #e7effb;
+    }
+
+    &--gold {
+      background: #f7f0df;
+    }
+  }
+
+  &__img {
+    width: 44rpx;
+    height: 44rpx;
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    display: block;
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #16233b;
+  }
+
+  &__desc {
+    display: block;
+    margin-top: 6rpx;
+    font-size: 20rpx;
+    color: #8b98ab;
+    line-height: 1.5;
+  }
+
+  &__arrow {
+    width: 28rpx;
+    height: 28rpx;
+    margin-left: 8rpx;
+    flex-shrink: 0;
+  }
+}
+
+// ---------- 三步流程 ----------
+.steps {
+  margin: 32rpx 24rpx 0;
+  padding: 28rpx 32rpx;
+
+  &__list {
+    margin-top: 24rpx;
+  }
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  padding: 14rpx 0;
+
+  &__icon {
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 18rpx;
+    background: #f2f6fb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 22rpx;
+    flex-shrink: 0;
+  }
+
+  &__img {
+    width: 40rpx;
+    height: 40rpx;
+  }
+
+  &__title {
+    display: block;
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #16233b;
+  }
+
+  &__desc {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 22rpx;
+    color: #8b98ab;
+  }
+}
+
+// ---------- 最近记录 ----------
+.recent {
+  margin: 32rpx 24rpx 0;
+  padding: 28rpx 32rpx;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__more {
+    font-size: 24rpx;
+    color: #1b4680;
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48rpx 0 28rpx;
+  }
+
+  &__empty-text {
+    font-size: 24rpx;
+    color: #8b98ab;
+  }
+
+  &__cta {
+    margin-top: 24rpx;
+    height: 72rpx;
+    line-height: 72rpx;
+    padding: 0 48rpx;
+    border-radius: 36rpx;
+    background: linear-gradient(135deg, #22579d, #0f2b4c);
+    color: #fff;
+    font-size: 26rpx;
+  }
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  padding: 26rpx 0;
+  border-bottom: 2rpx solid #f0f2f6;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__dot {
+    width: 12rpx;
+    height: 12rpx;
+    border-radius: 50%;
+    margin-right: 18rpx;
+    flex-shrink: 0;
+  }
+
+  &__main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__summary {
+    display: block;
+    font-size: 27rpx;
+    color: #16233b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    margin-top: 8rpx;
+  }
+
+  &__cat {
+    font-size: 21rpx;
+    color: #1b4680;
+    background: #f2f6fb;
+    padding: 2rpx 14rpx;
+    border-radius: 999rpx;
+    margin-right: 14rpx;
+  }
+
+  &__time {
+    font-size: 20rpx;
+    color: #a4aebb;
+  }
+
+  &__right {
+    display: flex;
+    align-items: center;
+    margin-left: 16rpx;
+  }
+
+  &__status {
+    font-size: 20rpx;
+    padding: 4rpx 14rpx;
+    border-radius: 999rpx;
+    white-space: nowrap;
+  }
+
+  &__arrow {
+    width: 26rpx;
+    height: 26rpx;
+    margin-left: 10rpx;
+  }
+}
+
+// ---------- 底部 ----------
+.home__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 44rpx;
+
+  &-icon {
+    width: 28rpx;
+    height: 28rpx;
+    margin-right: 10rpx;
+    opacity: 0.6;
+  }
+
+  text {
+    font-size: 21rpx;
+    color: #a4aebb;
+  }
+}
+
+
+// ---------- 维权指南入口 ----------
+.guide-entry {
+  display: flex;
+  align-items: center;
+  margin: 24rpx 24rpx 0;
+  background: linear-gradient(135deg, #f7f0df, #fdf8ec);
+  border: 2rpx solid #efe6cf;
+  border-radius: 22rpx;
+  padding: 24rpx 28rpx;
+
+  &__icon {
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 18rpx;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 20rpx;
+    flex-shrink: 0;
+    box-shadow: 0 6rpx 16rpx rgba(184, 146, 60, 0.15);
+  }
+
+  &__img {
+    width: 40rpx;
+    height: 40rpx;
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    display: block;
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #16233b;
+  }
+
+  &__desc {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 21rpx;
+    color: #8a6d2f;
+  }
+
+  &__arrow {
+    width: 28rpx;
+    height: 28rpx;
+    margin-left: 12rpx;
+  }
+}
+
+.hero__tag {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 44rpx;
+  margin-bottom: -10rpx;
+
+  &-line {
+    width: 48rpx;
+    height: 2rpx;
+    background: linear-gradient(90deg, rgba(217,188,120,0), rgba(217,188,120,0.9));
+    margin: 0 16rpx;
+
+    &:last-child {
+      background: linear-gradient(90deg, rgba(217,188,120,0.9), rgba(217,188,120,0));
+    }
+  }
+
+  text {
+    color: rgba(217, 188, 120, 0.95);
+    font-size: 21rpx;
+    letter-spacing: 3rpx;
+  }
+}
+
+
+// ---------- 其他输入方式标签 ----------
+.entries-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 44rpx 0 22rpx;
+
+  &__line {
+    width: 48rpx;
+    height: 2rpx;
+    background: #d5dce7;
+    margin: 0 16rpx;
+  }
+
+  text {
+    font-size: 21rpx;
+    color: #8b98ab;
+    letter-spacing: 2rpx;
+  }
+}
+
+.recent__skeleton {
+  margin-top: 8rpx;
+}
+
+.trust-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 34rpx 24rpx 0;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 22rpx 0;
+  box-shadow: 0 8rpx 28rpx rgba(15, 43, 76, 0.06);
+
+  &__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  &__num {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: #1b4680;
+  }
+
+  &__label {
+    margin-top: 4rpx;
+    font-size: 20rpx;
+    color: #8b98ab;
+  }
+
+  &__divider {
+    width: 2rpx;
+    height: 40rpx;
+    background: #eef1f6;
+  }
+}

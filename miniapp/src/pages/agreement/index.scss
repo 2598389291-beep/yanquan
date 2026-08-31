@@ -1,0 +1,50 @@
+.agreement-page {
+  min-height: 100vh;
+  padding: 40rpx 36rpx 80rpx;
+
+  &__title {
+    display: block;
+    text-align: center;
+    font-size: 40rpx;
+    font-weight: 700;
+    color: #16233b;
+  }
+
+  &__updated {
+    display: block;
+    text-align: center;
+    margin-top: 14rpx;
+    font-size: 22rpx;
+    color: #a4aebb;
+  }
+
+  &__section {
+    margin-top: 44rpx;
+  }
+
+  &__h {
+    display: block;
+    font-size: 30rpx;
+    font-weight: 600;
+    color: #16233b;
+    margin-bottom: 16rpx;
+  }
+
+  &__body {
+    display: block;
+    font-size: 26rpx;
+    color: #5b6b82;
+    line-height: 1.9;
+    white-space: pre-wrap;
+  }
+
+  &__footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 72rpx;
+    font-size: 22rpx;
+    color: #a4aebb;
+    line-height: 2;
+  }
+}

@@ -1,0 +1,178 @@
+// ============================================================
+// 言权 · 全局设计系统
+// ============================================================
+
+page {
+  --brand-950: #0A1E38;
+  --brand-900: #0F2B4C;
+  --brand-800: #14375F;
+  --brand-700: #1B4680;
+  --brand-600: #22579D;
+  --brand-500: #2F6AB8;
+  --brand-100: #E4ECF7;
+  --brand-50: #F2F6FB;
+  --gold-600: #B8923C;
+  --gold-500: #C9A24B;
+  --gold-400: #D9BC78;
+  --gold-300: #E6D3A5;
+  --gold-100: #F7F0DF;
+  --bg: #F4F6FA;
+  --card: #FFFFFF;
+  --text-1: #16233B;
+  --text-2: #5B6B82;
+  --text-3: #8B98AB;
+  --line: #E7EBF2;
+  --success: #1E9E6A;
+  --warning: #E6A23C;
+  --danger: #E05B5B;
+  --info: #5B8DEF;
+
+  background-color: var(--bg);
+  color: var(--text-1);
+  font-size: 28rpx;
+  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+view, text, scroll-view, image, button, input, textarea, navigator {
+  box-sizing: border-box;
+}
+
+button {
+  &::after {
+    border: none;
+  }
+}
+
+.safe-area-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+// 通用卡片
+.card {
+  background: var(--card);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 8rpx 32rpx rgba(15, 43, 76, 0.05);
+}
+
+// 通用区块标题
+.section-title {
+  display: flex;
+  align-items: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-1);
+
+  .section-title-bar {
+    width: 8rpx;
+    height: 30rpx;
+    border-radius: 8rpx;
+    background: linear-gradient(180deg, var(--gold-400), var(--gold-600));
+    margin-right: 16rpx;
+  }
+}
+
+// 主按钮
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96rpx;
+  border-radius: 48rpx;
+  background: linear-gradient(135deg, var(--brand-700), var(--brand-900));
+  color: #FFFFFF;
+  font-size: 32rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  box-shadow: 0 12rpx 28rpx rgba(15, 43, 76, 0.28);
+  border: none;
+
+  &:active {
+    opacity: 0.88;
+  }
+
+  &[disabled] {
+    opacity: 0.45;
+    box-shadow: none;
+  }
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, var(--gold-400), var(--gold-600));
+  color: #1B2A42;
+  box-shadow: 0 12rpx 28rpx rgba(184, 146, 60, 0.3);
+}
+
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  border-radius: 44rpx;
+  background: var(--brand-50);
+  border: 2rpx solid var(--brand-100);
+  color: var(--brand-700);
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+// 标签
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  line-height: 1.4;
+}
+
+// 空状态
+.empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 32rpx;
+
+  .empty-icon {
+    width: 120rpx;
+    height: 120rpx;
+    margin-bottom: 24rpx;
+    opacity: 0.5;
+  }
+
+  .empty-text {
+    color: var(--text-3);
+    font-size: 28rpx;
+  }
+}
+
+// 底部安全操作栏
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20rpx);
+  border-top: 2rpx solid var(--line);
+  padding: 20rpx 32rpx;
+
+  .bar-inner {
+    display: flex;
+    gap: 20rpx;
+    align-items: center;
+  }
+}
+
+.bottom-pad {
+  height: 160rpx;
+}

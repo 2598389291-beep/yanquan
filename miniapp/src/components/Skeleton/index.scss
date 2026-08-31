@@ -1,0 +1,51 @@
+.skeleton {
+  padding: 12rpx 4rpx;
+
+  &__item {
+    padding: 28rpx 0;
+    border-bottom: 2rpx solid #f0f2f6;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__bar {
+    height: 26rpx;
+    border-radius: 10rpx;
+    background: linear-gradient(90deg, #eef1f6 25%, #f7f9fc 37%, #eef1f6 63%);
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.3s ease infinite;
+
+    &--title {
+      width: 45%;
+      height: 30rpx;
+    }
+
+    &--line {
+      width: 92%;
+      margin-top: 18rpx;
+    }
+
+    &--short {
+      width: 60%;
+      margin-top: 14rpx;
+    }
+  }
+
+  &--card {
+    .skeleton__item {
+      background: #fff;
+      border-radius: 20rpx;
+      padding: 30rpx;
+      margin-bottom: 18rpx;
+      border-bottom: none;
+      box-shadow: 0 6rpx 24rpx rgba(15, 43, 76, 0.05);
+    }
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}

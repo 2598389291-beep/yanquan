@@ -1,0 +1,1187 @@
+.result-view {
+  padding: 0 24rpx;
+}
+
+// ---------- 维权路径 ----------
+.path-list {
+  padding-left: 8rpx;
+}
+
+.path-item {
+  display: flex;
+
+  &__rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 64rpx;
+    flex-shrink: 0;
+  }
+
+  &__num {
+    width: 48rpx;
+    height: 48rpx;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 26rpx;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6rpx 14rpx rgba(15, 43, 76, 0.2);
+  }
+
+  &__line {
+    width: 0;
+    flex: 1;
+    border-left: 3rpx dashed;
+    margin: 10rpx 0;
+    min-height: 36rpx;
+  }
+
+  &__content {
+    flex: 1;
+    padding: 4rpx 0 32rpx 16rpx;
+  }
+
+  &__action {
+    display: block;
+    font-size: 29rpx;
+    font-weight: 600;
+    color: #16233b;
+  }
+
+  &__detail {
+    display: block;
+    margin-top: 10rpx;
+    font-size: 25rpx;
+    color: #5b6b82;
+    line-height: 1.7;
+  }
+}
+
+// ---------- 渠道建议 ----------
+.channel-summary {
+  background: #f2f6fb;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  font-size: 26rpx;
+  color: #2f5d8f;
+  margin-bottom: 20rpx;
+  line-height: 1.7;
+}
+
+.channel-item {
+  border: 2rpx solid #e7ebf2;
+  border-radius: 18rpx;
+  padding: 22rpx 24rpx;
+  margin-bottom: 18rpx;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10rpx;
+  }
+
+  &__name {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #16233b;
+    margin-left: 14rpx;
+  }
+
+  &__reason {
+    display: block;
+    font-size: 25rpx;
+    color: #5b6b82;
+  }
+
+  &__law {
+    display: block;
+    font-size: 23rpx;
+    color: #b8923c;
+    margin-top: 8rpx;
+  }
+
+  &__action {
+    display: block;
+    font-size: 24rpx;
+    color: #5b6b82;
+    margin-top: 8rpx;
+    line-height: 1.6;
+  }
+
+  &__entry {
+    margin-top: 16rpx;
+    height: 60rpx;
+    line-height: 60rpx;
+    padding: 0 30rpx;
+    border-radius: 30rpx;
+    background: linear-gradient(135deg, #22579d, #0f2b4c);
+    color: #fff;
+    font-size: 23rpx;
+    font-weight: 600;
+  }
+}
+
+.channel-type {
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 21rpx;
+  font-weight: 600;
+
+
+.action-guide__sub {
+  display: block;
+  font-size: 23rpx;
+  color: #8b98ab;
+  margin-bottom: 18rpx;
+}
+
+.action-step {
+  display: flex;
+  align-items: flex-start;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid #f0f2f6;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__check {
+    width: 40rpx;
+    height: 40rpx;
+    border-radius: 50%;
+    border: 3rpx solid #c9d2e0;
+    margin-right: 20rpx;
+    margin-top: 4rpx;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &--done {
+      background: linear-gradient(135deg, #22579d, #0f2b4c);
+      border-color: #22579d;
+    }
+  }
+
+  &__tick {
+    width: 20rpx;
+    height: 10rpx;
+    border-left: 4rpx solid #fff;
+    border-bottom: 4rpx solid #fff;
+    transform: rotate(-45deg) translateY(-2rpx);
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__action {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: #16233b;
+  }
+
+  &__duration {
+    font-size: 20rpx;
+    color: #b8923c;
+    background: #f7f0df;
+    padding: 4rpx 14rpx;
+    border-radius: 999rpx;
+    margin-left: 12rpx;
+    flex-shrink: 0;
+  }
+
+  &__detail {
+    display: block;
+    margin-top: 8rpx;
+    font-size: 23rpx;
+    color: #5b6b82;
+    line-height: 1.6;
+  }
+
+  &--done .action-step__action,
+  &--done .action-step__detail {
+    color: #a4aebb;
+    text-decoration: line-through;
+  }
+}
+
+.action-guide__foot {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 21rpx;
+  color: #8b98ab;
+  text-align: center;
+}
+
+.evidence-list {
+  &__hint {
+    display: block;
+    font-size: 23rpx;
+    color: #8b98ab;
+    margin-bottom: 16rpx;
+  }
+
+  &__item {
+    display: flex;
+    align-items: flex-start;
+    padding: 16rpx 0;
+    border-bottom: 2rpx solid #f0f2f6;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__num {
+    width: 36rpx;
+    height: 36rpx;
+    border-radius: 10rpx;
+    background: #f7f0df;
+    color: #b8923c;
+    font-size: 20rpx;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16rpx;
+    flex-shrink: 0;
+    margin-top: 4rpx;
+  }
+
+  &__main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__name {
+    display: block;
+    font-size: 25rpx;
+    font-weight: 600;
+    color: #16233b;
+  }
+
+  &__purpose {
+    display: block;
+    margin-top: 6rpx;
+    font-size: 22rpx;
+    color: #5b6b82;
+  }
+
+  &__how {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 21rpx;
+    color: #b8923c;
+  }
+}
+  &--xieshang { background: #e4f5ee; color: #1e9e6a; }
+  &--tousu { background: #e7effb; color: #2f6ab8; }
+  &--jubao { background: #fdf1e3; color: #d97706; }
+  &--susong { background: #f1eafb; color: #8a5cd6; }
+}
+
+// ---------- 法律依据 ----------
+.law-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.law-item {
+  display: flex;
+  align-items: flex-start;
+  background: #f7f0df;
+  border-radius: 16rpx;
+  padding: 18rpx 22rpx;
+
+  &__seal {
+    width: 44rpx;
+    height: 44rpx;
+    border-radius: 10rpx;
+    background: linear-gradient(135deg, #d9bc78, #b8923c);
+    color: #fff;
+    font-size: 26rpx;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 18rpx;
+    flex-shrink: 0;
+  }
+
+  &__text {
+    font-size: 26rpx;
+    color: #4a3d1f;
+    font-weight: 500;
+    line-height: 1.6;
+  }
+}
+
+.law-note {
+  margin-top: 20rpx;
+  font-size: 22rpx;
+  color: #8b98ab;
+}
+
+// ---------- 投诉信 ----------
+.letter-edit-btn {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  background: #f2f6fb;
+  color: #1b4680;
+  font-size: 24rpx;
+  line-height: 1.4;
+
+  &__icon {
+    width: 28rpx;
+    height: 28rpx;
+    margin-right: 6rpx;
+  }
+}
+
+.letter-textarea {
+  width: 100%;
+  min-height: 480rpx;
+  background: #fafbfd;
+  border: 2rpx solid #e7ebf2;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  font-size: 27rpx;
+  line-height: 1.8;
+}
+
+.letter-doc {
+  background: #fffdf8;
+  border: 2rpx solid #efe6cf;
+  border-radius: 16rpx;
+  padding: 32rpx 28rpx;
+
+  &__text {
+    font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+    font-size: 27rpx;
+    line-height: 2;
+    color: #2c2c2c;
+    white-space: pre-wrap;
+  }
+}
+
+.letter-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 24rpx;
+  height: 84rpx;
+  border-radius: 42rpx;
+  background: linear-gradient(135deg, #22579d, #0f2b4c);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 500;
+
+  &__icon {
+    width: 34rpx;
+    height: 34rpx;
+    margin-right: 10rpx;
+  }
+}
+
+// ---------- 话术 ----------
+.script-item {
+  border: 2rpx solid #e7ebf2;
+  border-radius: 18rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12rpx;
+  }
+
+  &__num {
+    width: 40rpx;
+    height: 40rpx;
+    border-radius: 50%;
+    background: #0f2b4c;
+    color: #fff;
+    font-size: 22rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 14rpx;
+  }
+
+  &__title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #16233b;
+  }
+
+  &__target {
+    display: block;
+    font-size: 23rpx;
+    color: #b8923c;
+  }
+
+  &__scenario {
+    display: block;
+    font-size: 24rpx;
+    color: #8b98ab;
+    margin-top: 6rpx;
+  }
+
+  &__body {
+    margin-top: 14rpx;
+    background: #f7f8fb;
+    border-radius: 14rpx;
+    padding: 20rpx;
+    font-size: 26rpx;
+    color: #333;
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+
+  &__tips {
+    display: block;
+    margin-top: 12rpx;
+    font-size: 23rpx;
+    color: #8b98ab;
+  }
+
+  &__copy {
+    margin-top: 18rpx;
+    height: 68rpx;
+    border-radius: 34rpx;
+    background: #f2f6fb;
+    color: #1b4680;
+    font-size: 25rpx;
+    line-height: 68rpx;
+  }
+}
+
+// ---------- 资质 ----------
+.qual-summary {
+  background: #f2f6fb;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  font-size: 26rpx;
+  color: #2f5d8f;
+  margin-bottom: 20rpx;
+  line-height: 1.7;
+}
+
+.qual-item {
+  border-left: 6rpx solid #d9bc78;
+  background: #fffdf8;
+  border-radius: 0 16rpx 16rpx 0;
+  padding: 20rpx 24rpx;
+  margin-bottom: 16rpx;
+
+  &__title {
+    display: block;
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #16233b;
+    margin-bottom: 8rpx;
+  }
+
+  &__row {
+    display: block;
+    font-size: 24rpx;
+    color: #5b6b82;
+    line-height: 1.7;
+
+    &--warn {
+      color: #c2571b;
+    }
+  }
+}
+
+// ---------- 建议 ----------
+.sug-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 14rpx;
+
+  &__dot {
+    width: 12rpx;
+    height: 12rpx;
+    border-radius: 50%;
+    background: #d9bc78;
+    margin: 18rpx 16rpx 0 0;
+    flex-shrink: 0;
+  }
+
+  text {
+    font-size: 26rpx;
+    color: #5b6b82;
+    line-height: 1.7;
+  }
+}
+
+// ---------- 免责 ----------
+.disclaimer {
+  background: #f0f2f6;
+  border-radius: 18rpx;
+  padding: 24rpx 28rpx;
+  margin: 8rpx 0 32rpx;
+
+  &__title {
+    display: block;
+    font-size: 24rpx;
+    font-weight: 600;
+    color: #5b6b82;
+  }
+
+  &__text {
+    display: block;
+    margin-top: 8rpx;
+    font-size: 22rpx;
+    color: #8b98ab;
+    line-height: 1.7;
+  }
+}
+
+
+// ---------- 法条原文卡片 ----------
+.law-card {
+  background: #f7f0df;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  overflow: hidden;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    padding: 18rpx 22rpx;
+  }
+
+  &__seal {
+    width: 44rpx;
+    height: 44rpx;
+    border-radius: 10rpx;
+    background: linear-gradient(135deg, #d9bc78, #b8923c);
+    color: #fff;
+    font-size: 26rpx;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 18rpx;
+    flex-shrink: 0;
+  }
+
+  &__title {
+    flex: 1;
+    font-size: 26rpx;
+    color: #4a3d1f;
+    font-weight: 600;
+  }
+
+  &__arrow {
+    width: 26rpx;
+    height: 26rpx;
+    margin-left: 10rpx;
+    transition: transform 0.2s;
+
+    &--open {
+      transform: rotate(90deg);
+    }
+  }
+
+  &__body {
+    padding: 0 22rpx 20rpx;
+    border-top: 2rpx solid rgba(184, 146, 60, 0.2);
+  }
+
+  &__content {
+    display: block;
+    padding-top: 16rpx;
+    font-size: 24rpx;
+    color: #5b4a26;
+    line-height: 1.8;
+  }
+
+  &__link {
+    margin-top: 16rpx;
+    height: 64rpx;
+    line-height: 64rpx;
+    border-radius: 32rpx;
+    background: #0f2b4c;
+    color: #fff;
+    font-size: 24rpx;
+    padding: 0 28rpx;
+    display: inline-flex;
+    width: auto;
+  }
+
+  &__note {
+    display: block;
+    margin-top: 10rpx;
+    font-size: 20rpx;
+    color: #a08a52;
+  }
+}
+
+// ---------- 投诉信操作 ----------
+.letter-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.letter-copy,
+.letter-pack {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 84rpx;
+  border-radius: 42rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.letter-copy {
+  background: linear-gradient(135deg, #22579d, #0f2b4c);
+  color: #fff;
+
+  &__icon {
+    width: 32rpx;
+    height: 32rpx;
+    margin-right: 8rpx;
+  }
+}
+
+.letter-pack {
+  background: #f7f0df;
+  color: #8a6d2f;
+}
+
+// ---------- 反馈 ----------
+.feedback {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 26rpx 30rpx;
+  margin: 0 0 24rpx;
+  box-shadow: 0 8rpx 32rpx rgba(15, 43, 76, 0.05);
+
+  &__done {
+    display: block;
+    text-align: center;
+    font-size: 26rpx;
+    color: #1e9e6a;
+    font-weight: 500;
+  }
+
+  &__title {
+    display: block;
+    text-align: center;
+    font-size: 26rpx;
+    color: #5b6b82;
+  }
+
+  &__btns {
+    display: flex;
+    gap: 20rpx;
+    margin-top: 20rpx;
+  }
+
+  &__btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 80rpx;
+    border-radius: 40rpx;
+    background: #f2f6fb;
+    color: #1b4680;
+    font-size: 26rpx;
+    font-weight: 600;
+  }
+
+  &__form {
+    margin-top: 20rpx;
+  }
+
+  &__textarea {
+    width: 100%;
+    min-height: 120rpx;
+    background: #fafbfd;
+    border: 2rpx solid #e7ebf2;
+    border-radius: 14rpx;
+    padding: 18rpx;
+    font-size: 25rpx;
+    line-height: 1.6;
+  }
+
+  &__placeholder {
+    color: #a4aebb;
+  }
+
+  &__submit {
+    margin-top: 16rpx;
+    height: 72rpx;
+    line-height: 72rpx;
+    border-radius: 36rpx;
+    background: linear-gradient(135deg, #22579d, #0f2b4c);
+    color: #fff;
+    font-size: 26rpx;
+  }
+}
+
+.next-step {
+  background: linear-gradient(150deg, #0f2b4c, #1b4680);
+  border-radius: 24rpx;
+  padding: 30rpx 30rpx 26rpx;
+  margin: 0 0 24rpx;
+  box-shadow: 0 14rpx 36rpx rgba(15, 43, 76, 0.22);
+
+  &__head {
+    margin-bottom: 20rpx;
+  }
+
+  &__title {
+    display: block;
+    color: #fff;
+    font-size: 31rpx;
+    font-weight: 700;
+    letter-spacing: 1rpx;
+  }
+
+  &__sub {
+    display: block;
+    margin-top: 6rpx;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 23rpx;
+  }
+
+  &__steps {
+    margin-bottom: 22rpx;
+  }
+
+  &__item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12rpx;
+  }
+
+  &__num {
+    width: 34rpx;
+    height: 34rpx;
+    border-radius: 50%;
+    background: rgba(217, 188, 120, 0.95);
+    color: #1b2a42;
+    font-size: 20rpx;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 14rpx;
+    flex-shrink: 0;
+    margin-top: 3rpx;
+  }
+
+  &__item text {
+    flex: 1;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 24rpx;
+    line-height: 1.6;
+  }
+
+  &__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 84rpx;
+    border-radius: 42rpx;
+    background: linear-gradient(135deg, #d9bc78, #b8923c);
+    color: #1b2a42;
+    font-size: 27rpx;
+    font-weight: 600;
+    box-shadow: 0 10rpx 24rpx rgba(184, 146, 60, 0.35);
+  }
+
+  &__btn-icon {
+    width: 32rpx;
+    height: 32rpx;
+    margin-right: 10rpx;
+  }
+
+  &__btn--entry {
+    margin-top: 16rpx;
+    height: 72rpx;
+    border-radius: 36rpx;
+    background: rgba(255, 255, 255, 0.12);
+    border: 2rpx solid rgba(217, 188, 120, 0.6);
+    color: #e9d9ae;
+    font-size: 23rpx;
+    box-shadow: none;
+  }
+}
+
+.route-card {
+  border-radius: 20rpx;
+  padding: 22rpx 26rpx;
+  margin-bottom: 16rpx;
+
+  &--12315 {
+    background: linear-gradient(135deg, #eef4fc, #dbe9fa);
+    border: 2rpx solid #bcd6f5;
+  }
+
+  &--hemao {
+    background: linear-gradient(135deg, #fff6ec, #ffe9d2);
+    border: 2rpx solid #f6cf9f;
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10rpx;
+  }
+
+  &__name {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: #16233b;
+  }
+
+  &__tag {
+    font-size: 20rpx;
+    font-weight: 600;
+    border-radius: 999rpx;
+    padding: 4rpx 16rpx;
+
+    .route-card--12315 & {
+      color: #22579d;
+      background: rgba(34, 87, 157, 0.1);
+    }
+
+    .route-card--hemao & {
+      color: #c2572a;
+      background: rgba(194, 87, 42, 0.1);
+    }
+  }
+
+  &__desc {
+    display: block;
+    font-size: 23rpx;
+    color: #5b6b82;
+    line-height: 1.6;
+  }
+
+  &__action {
+    display: block;
+    margin-top: 12rpx;
+    font-size: 22rpx;
+    font-weight: 600;
+    color: #22579d;
+  }
+}
+
+.more-channels__label {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.72);
+  margin: 4rpx 0 14rpx;
+}
+
+.more-channels {
+  display: flex;
+  justify-content: center;
+  padding: 14rpx 0 4rpx;
+
+  &__text {
+    font-size: 22rpx;
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+.rec-card {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2rpx solid rgba(217, 188, 120, 0.55);
+  border-radius: 20rpx;
+  padding: 22rpx 26rpx;
+  margin-bottom: 16rpx;
+
+  &__label {
+    font-size: 21rpx;
+    color: rgba(217, 188, 120, 0.9);
+    letter-spacing: 2rpx;
+  }
+
+  &__main {
+    margin-top: 10rpx;
+  }
+
+  &__name {
+    font-size: 34rpx;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  &__reason, &__backup {
+    display: block;
+    margin-top: 8rpx;
+    font-size: 22rpx;
+    color: rgba(255, 255, 255, 0.82);
+    line-height: 1.6;
+  }
+}
+
+.planb-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 2rpx solid rgba(255, 255, 255, 0.16);
+  border-radius: 20rpx;
+  padding: 22rpx 26rpx;
+  margin-bottom: 16rpx;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12rpx;
+  }
+
+  &__title {
+    font-size: 26rpx;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  &__tag {
+    font-size: 19rpx;
+    color: #e9d9ae;
+    background: rgba(217, 188, 120, 0.15);
+    padding: 4rpx 14rpx;
+    border-radius: 999rpx;
+  }
+
+  &__item {
+    display: flex;
+    align-items: flex-start;
+    padding: 10rpx 0;
+  }
+
+  &__num {
+    width: 34rpx;
+    height: 34rpx;
+    border-radius: 50%;
+    background: #d9bc78;
+    color: #1b2a42;
+    font-size: 19rpx;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 14rpx;
+    flex-shrink: 0;
+    margin-top: 3rpx;
+  }
+
+  &__body {
+    flex: 1;
+  }
+
+  &__action {
+    display: block;
+    font-size: 23rpx;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+  }
+
+  &__detail {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 21rpx;
+    color: rgba(255, 255, 255, 0.68);
+    line-height: 1.6;
+  }
+}
+
+.matched-channel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2rpx solid rgba(217, 188, 120, 0.35);
+  border-radius: 18rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 12rpx;
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+    margin-right: 14rpx;
+  }
+
+  &__name {
+    display: block;
+    font-size: 24rpx;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  &__reason {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 20rpx;
+    color: #e9d9ae;
+  }
+
+  &__entry {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 19rpx;
+    color: rgba(255, 255, 255, 0.6);
+  }
+}
+
+.outcome-card {
+  background: #fff;
+  border-radius: 22rpx;
+  padding: 24rpx 28rpx;
+  margin: 0 0 24rpx;
+  box-shadow: 0 8rpx 32rpx rgba(15, 43, 76, 0.05);
+
+  &__title {
+    display: block;
+    font-size: 24rpx;
+    font-weight: 600;
+    color: #16233b;
+    margin-bottom: 16rpx;
+  }
+
+  &__btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+  }
+
+  &__btn {
+    flex: 1;
+    min-width: 130rpx;
+    text-align: center;
+    background: #f2f6fb;
+    border-radius: 14rpx;
+    padding: 14rpx 0;
+
+    &-text {
+      font-size: 23rpx;
+      color: #1b4680;
+      font-weight: 600;
+    }
+  }
+
+  &__skip {
+    display: block;
+    margin-top: 14rpx;
+    text-align: center;
+    font-size: 21rpx;
+    color: #a4aebb;
+  }
+}
+
+.next-step__channels {
+  margin-bottom: 22rpx;
+}
+
+.channel-copy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2rpx solid rgba(255, 255, 255, 0.14);
+  border-radius: 18rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 12rpx;
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+    margin-right: 16rpx;
+  }
+
+  &__name {
+    display: block;
+    font-size: 24rpx;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  &__desc {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 19rpx;
+    color: rgba(255, 255, 255, 0.55);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__btn {
+    flex-shrink: 0;
+    padding: 10rpx 24rpx;
+    border-radius: 999rpx;
+    font-size: 21rpx;
+    font-weight: 600;
+
+    &--mp {
+      background: linear-gradient(135deg, #d9bc78, #b8923c);
+      color: #1b2a42;
+    }
+
+    &--web {
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+      border: 2rpx solid rgba(217, 188, 120, 0.5);
+    }
+
+    &--call {
+      background: linear-gradient(135deg, #2fae60, #1f8a4b);
+      color: #fff;
+    }
+  }
+}
+
+.next-step__tip {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 21rpx;
+  line-height: 1.7;
+  margin-bottom: 18rpx;
+}
+
+// ---------- 复制全套材料按钮（防溢出） ----------
+.next-step__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  min-height: 84rpx;
+  height: auto;
+  padding: 18rpx 24rpx;
+  border-radius: 42rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.next-step__btn-text {
+  flex-shrink: 1;
+}

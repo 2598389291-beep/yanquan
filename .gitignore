@@ -1,0 +1,37 @@
+# ===== 密钥与本地配置（绝不提交） =====
+.env
+.env.*
+backend/.env
+backend/.env.*
+!.env.example
+!backend/.env.example
+
+# ===== 微信开发者工具认证（绝不提交） =====
+miniapp/.auth/
+
+# ===== 数据库与本地数据 =====
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+backend/data/
+uploads/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# ===== Node / 前端 =====
+node_modules/
+miniapp/dist/
+
+# ===== 构建产物 =====
+scripts/cloudrun/
+scripts/*.zip
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
