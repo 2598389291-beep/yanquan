@@ -151,3 +151,76 @@ def test_llm_total_failure_falls_back(monkeypatch):
     assert result["legal_basis"]
     assert result["negotiation_script"]["steps"]
     assert result["channel_advice"]["channels"]
+
+
+def test_letter_needs_review_detects_problems():
+    """规则初筛：缺板块/未引法条时应触发模型质检"""
+    from backend.services.complaint_generator import _letter_needs_review
+
+    text = "事实与理由：" + "内容" * 120
+    need, issues = _letter_needs_review(text, {"amount": "399", "issue_date": "2026-01-01"}, [])
+    assert need is True
+    assert any("法律依据" in i or "诉求" in i for i in issues)
+
+
+def test_letter_needs_review_passes_complete_letter():
+    """板块完整、已引法条、信息齐全的文书不必再花一次模型调用"""
+    from backend.services.complaint_generator import _letter_needs_review
+
+    letter = (
+        "投诉人：【请补充姓名】\n被投诉方：【请补充被投诉方全称】\n"
+        "投诉事项：购买商品存在欺诈行为\n"
+        "事实与理由：" + "内容" * 120 + "\n"
+        "法律依据：《消费者权益保护法》第55条\n"
+        "诉求：退款 399 元\n"
+        "时间：2026 年 1 月 1 日，金额：399 元\n"
+    )
+    need, issues = _letter_needs_review(
+        letter,
+        {"amount": "399", "issue_date": "2026-01-01"},
+        [{"law_name": "消费者权益保护法"}],
+    )
+    assert need is False, f"不应触发质检，却命中：{issues}"
+
+
+def test_verify_facts_drops_hallucinated_fields():
+    """事实核验：用户原话里没有的金额/日期/商家名，不能被当成事实带到文书里"""
+    from backend.services.complaint_generator import _verify_facts_against_text
+
+    facts = {
+        "amount": "899",
+        "issue_date": "2024年5月10日",
+        "seller": "某某科技有限公司",
+        "platform": "抖音",
+        "missing_fields": [],
+    }
+    raw = "在抖音直播间买了一套护肤品 899 元，收到发现是假货，商家拒绝退款"
+    out = _verify_facts_against_text(facts, raw)
+
+    assert out["amount"] == "899", "原文确实提到的金额应保留"
+    assert out["platform"] == "抖音", "原文提到的平台应保留"
+    assert out["issue_date"] == "", "原文未提及的日期应清空"
+    assert out["seller"] == "", "原文未提及的商家名应清空"
+    assert any("购买时间" in m for m in out["missing_fields"])
+def test_sanitize_letter_is_idempotent():
+    """净化函数重复调用不能产生重复占位符（模型可能自己就写了占位符）"""
+    from backend.services.complaint_generator import _sanitize_letter
+
+    letter = "投诉人：【请补充姓名】\n联系电话：【请补充手机号】\n被投诉方：【请补充被投诉方全称】\n事实与理由：不详" * 5
+    once = _sanitize_letter(letter, {"amount": "", "issue_date": "", "seller": ""})
+    twice = _sanitize_letter(once, {"amount": "", "issue_date": "", "seller": ""})
+    assert once == twice, "重复净化不应产生任何变化"
+    assert "【请补充姓名】【请补充姓名】" not in twice
+
+
+def test_sanitize_letter_removes_dashed_phone():
+    """带分隔符的编造手机号（138-1234-5678）也必须被替换"""
+    from backend.services.complaint_generator import _sanitize_letter
+
+    for raw_phone in ("138-1234-5678", "138 1234 5678", "13812345678"):
+        out = _sanitize_letter(f"联系电话：{raw_phone}\n事实与理由：不详", {"amount": "", "issue_date": "", "seller": ""})
+        assert raw_phone not in out, f"{raw_phone} 未被替换"
+        assert "请补充手机号" in out
+    # 公共热线不能被误伤
+    keep = _sanitize_letter("可拨打 12315 或快递公司热线 95311 反映", {})
+    assert "12315" in keep and "95311" in keep

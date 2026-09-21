@@ -39,7 +39,50 @@ FACT_DEFAULTS = {
 #  Step 1: 事实提取
 # ============================================================
 
+def _number_in_text(value: str, text: str) -> bool:
+    """判断一个数字类的值是否真的在用户原话里出现过（避免模型自己填金额/日期）"""
+    nums = re.findall(r"\d+", str(value or ""))
+    if not nums:
+        return False
+    text_nums = re.findall(r"\d+", text or "")
+    joined = "".join(text_nums)
+    # 每个数字片段都要能在原文里找到（或者作为原文数字串的一部分）
+    return all(n in text_nums or n in joined for n in nums)
+
+
+def _verify_facts_against_text(facts: dict, raw_text: str, order_info: Optional[dict] = None) -> dict:
+    """把事实提取结果与用户原话交叉核对：用户没提过的关键信息一律清空。
+
+    模型有时会把"合理推测"当成事实（例如自己编一个购买日期、金额、商家名称），
+    这些信息一旦写进投诉信就是硬伤。这里在进入后续环节之前先做一次事实核验。
+    """
+    raw = raw_text or ""
+    order_blob = json.dumps(order_info or {}, ensure_ascii=False)
+    missing = list(facts.get("missing_fields") or [])
+
+    def _clear(key: str, label: str, ok: bool) -> None:
+        value = str(facts.get(key) or "").strip()
+        if value and not ok:
+            logger.warning("事实核验：%s=%r 未在用户原话中出现，已清除", key, value)
+            facts[key] = ""
+            note = f"未提及{label}"
+            if note not in missing:
+                missing.append(note)
+
+    _clear("amount", "具体金额", _number_in_text(str(facts.get("amount") or ""), raw + order_blob))
+    _clear("issue_date", "购买时间", _number_in_text(str(facts.get("issue_date") or ""), raw))
+    for key, label in (("seller", "商家名称"), ("platform", "电商平台")):
+        value = str(facts.get(key) or "").strip()
+        if value and value not in raw and value not in order_blob:
+            _clear(key, label, False)
+
+    facts["missing_fields"] = missing
+    return facts
+
+
 def _extract_facts(raw_text: str, order_info: Optional[dict] = None) -> dict:
+
+
     """从用户口述中提取结构化事实（LLM），失败时回退最小结构"""
 
     order_context = ""
@@ -100,6 +143,8 @@ def _extract_facts(raw_text: str, order_info: Optional[dict] = None) -> dict:
             facts["seller"] = order_info["seller"]
         facts["order_info"] = order_info
 
+    # 事实核验：把模型"推测"、但用户从未提过的信息清掉
+    facts = _verify_facts_against_text(facts, raw_text, order_info)
     return facts
 
 
@@ -201,8 +246,12 @@ def _validate_matched_laws(matched: list) -> list:
     return filtered
 
 
-def _match_laws(facts: dict) -> list:
-    """LLM 语义匹配本地法律知识库，选 1-3 条最相关条文"""
+def _match_laws(facts: dict, raw_text: str = "") -> list:
+    """LLM 语义匹配本地法律知识库，选 1-3 条最相关条文
+
+    raw_text 不为空时会把用户原话一并拼进检索查询，这样本步可以跟事实提取并行执行
+    （检索只依赖文本，不依赖结构化结果），实测可省下一次串行模型调用的等待。
+    """
     external_result = _external_law_match(facts)
     if external_result is not None:
         return external_result
@@ -217,6 +266,8 @@ def _match_laws(facts: dict) -> list:
         str(facts.get("issue_type", "")), str(facts.get("category", "")),
         str(facts.get("issue_description", ""))[:200], str(facts.get("desired_outcome", "")),
     ])
+    if raw_text:
+        query = f"{query} {raw_text[:200]}".strip()
     candidates = retrieve_laws(query, k=10)
     if not candidates:
         candidates = all_laws
@@ -310,12 +361,29 @@ def _sanitize_letter(letter: str, facts: dict) -> str:
         letter = re.sub(r"订单号[:：]?\s*[A-Za-z0-9\-]{6,}", "【请补充订单号】", letter)
 
     # 投诉人信息：姓名/电话从不收集，出现具体值一律视为编造
-    letter = re.sub(r"投诉人[:：]\s*[^\n【]*", "投诉人：【请补充姓名】", letter)
-    letter = re.sub(r"联系电话[:：]?\s*(?:0?1[3-9]\d{9}|0\d{2,3}-?\d{7,8})", "联系电话：【请补充手机号】", letter)
+    # 只匹配行首；紧跟占位符时整体不匹配（避免回溯导致重复替换，保证幂等）
+    letter = re.sub(
+        r"(?m)^[ \t]*投诉人(?![:：]?\s*【请补充)[:：]?\s*[^\n【]*",
+        "投诉人：【请补充姓名】",
+        letter,
+    )
+    # 手机号：兼容「13812345678」「138-1234-5678」「138 1234 5678」「+86 138…」等写法
+    phone_value = r"(?:\+?86[\s-]?)?(?:1[3-9]\d[\s-]?\d{4}[\s-]?\d{4}|0\d{2,3}[\s-]?\d{7,8})"
+    letter = re.sub(
+        rf"(联系电话|手机号|手机|电话|联系方式)[:：]?\s*{phone_value}",
+        lambda m: f"{m.group(1)}：【请补充手机号】",
+        letter,
+    )
+    # 兜底：正文中孤立出现的手机号（12315 / 95311 等公共热线不会命中，因为第二位不是 3-9）
+    letter = re.sub(rf"(?<![\d-]){phone_value}(?![\d-])", "【请补充手机号】", letter)
 
     if not seller:
         # 被投诉方：整行值替换为占位（防止编造公司名/对象）
-        letter = re.sub(r"(被投诉方|投诉对象|投诉单位|被诉方)[:：]?\s*[^\n【]*", "被投诉方：【请补充被投诉方全称】", letter)
+        letter = re.sub(
+            r"(?m)^[ \t]*(被投诉方|投诉对象|投诉单位|被诉方)(?![:：]?\s*【请补充)[:：]?\s*[^\n【]*",
+            "被投诉方：【请补充被投诉方全称】",
+            letter,
+        )
         # 兜底：括号内疑似公司名（含有限公司/科技/贸易等字样）替换为占位
         letter = re.sub(r"（[^）【]*?(?:有限公司|公司|集团|贸易|科技|商贸|网络科技)[^）【]*?）", "（【请补充商家全称】）", letter)
     return letter
@@ -415,8 +483,38 @@ def _generate_complaint_letter(facts: dict, matched_laws: list) -> dict:
 #  Step 5: 自我审查
 # ============================================================
 
+def _letter_needs_review(letter: str, facts: dict, matched_laws: list) -> tuple:
+    """规则初筛：只有文书确实存在缺漏时才值得花一次模型调用去质检。
+
+    返回 (是否需要质检, 命中的问题列表)。校验点是模型质检清单里
+    可以被规则判定的部分（板块完整、引用了法条、缺失信息有占位）。
+    """
+    issues: list = []
+    if not letter or len(letter.strip()) < 200:
+        issues.append("文书过短或为空")
+    for section in ("事实", "法律依据", "诉求"):
+        if section not in letter:
+            issues.append(f"缺少「{section}」板块")
+    if matched_laws and not any(law.get("law_name") and law["law_name"] in letter for law in matched_laws):
+        issues.append("未引用匹配到的法条")
+    if not facts.get("amount") and "请补充具体金额" not in letter and "金额" not in letter:
+        issues.append("金额缺失且未标注占位")
+    if not facts.get("issue_date") and "请补充购买时间" not in letter and "时间" not in letter:
+        issues.append("时间缺失且未标注占位")
+    return (len(issues) > 0, issues)
+
+
+# ============================================================
+#  Step 5: 自我审查
+# ============================================================
+
 def _self_review(result: dict, facts: dict, matched_laws: list) -> dict:
+
+
+
+
     """LLM 质检投诉信质量并自动修复（金额/法条/诉求/格式等）"""
+
     complaint_letter = result.get("complaint_letter", "")
     if not complaint_letter:
         return result
@@ -599,19 +697,34 @@ def generate_complaint(raw_text: str, order_info: Optional[dict] = None) -> dict
             from .demo import generate_negotiation_script as rule_script
             negotiation_script = rule_script(facts, matched_laws)
 
-    # 代码级兜底：清除编造信息 + 确保引用正确法条
-    if result.get("complaint_letter"):
-        result["complaint_letter"] = _sanitize_letter(result["complaint_letter"], facts)
-        result["complaint_letter"] = _ensure_law_cited(result["complaint_letter"], matched_laws)
-
     # Step 4: 商家资质建议（规则驱动，无 LLM）
     result["merchant_qualification_advice"] = get_merchant_qualification_advice(facts)
 
     # Step 5: 自我审查（失败不影响结果）
+    # 规则初筛通过则跳过模型质检（失败不影响结果）
     try:
-        result = _self_review(result, facts, matched_laws)
+        need_review, review_issues = _letter_needs_review(result.get("complaint_letter", ""), facts, matched_laws)
+        if settings.llm_always_review or need_review:
+            if need_review:
+                logger.info("质检触发（规则初筛命中）：%s", "；".join(review_issues))
+            result = _self_review(result, facts, matched_laws)
+        else:
+            logger.info("规则初筛通过，跳过模型质检以降低耗时")
     except Exception as e:
         logger.warning("自我审查失败，保留原结果：%s", e)
+
+    if not result.get("suggestions"):
+        missing = facts.get("missing_fields") or []
+        result["suggestions"] = (
+            [f"建议补充：{item}" for item in missing]
+            if missing
+            else ["信息完整，可提交至12315平台。建议保留订单截图、支付凭证与聊天记录作为证据。"]
+        )
+
+    # 代码级兜底：放在质检之后，质检若重写了文书，同样要过一遍防编造净化
+    if result.get("complaint_letter"):
+        result["complaint_letter"] = _sanitize_letter(result["complaint_letter"], facts)
+        result["complaint_letter"] = _ensure_law_cited(result["complaint_letter"], matched_laws)
 
     # 补充类别 + 渠道建议
     result["category"] = facts.get("category", "其他")
@@ -659,39 +772,52 @@ def generate_complaint_progressive(
         pub("已完成（演示模式）", 1.0, result.get("complaint_letter", ""))
         return result
 
-    # ---------- Step 1: 事实提取 ----------
-    pub("正在梳理维权要点", 0.15)
-    try:
-        facts = _extract_facts(raw_text, order_info)
-        if not facts.get("issue_description"):
-            raise ValueError("事实提取结果为空")
-    except Exception as e:
-        logger.warning("LLM 事实提取失败，降级规则提取：%s", e)
-        from .demo import extract_facts as rule_extract
-        facts = rule_extract(raw_text, order_info)
-
-    # ---------- Step 2: 法律匹配 ----------
-    pub("正在匹配法律条文", 0.30)
-    try:
-        matched_laws = _validate_matched_laws(_match_laws(facts))
-        if not matched_laws:
-            raise ValueError("法律匹配为空或未通过校验")
-    except Exception as e:
-        logger.warning("LLM 法律匹配失败，降级规则匹配：%s", e)
-        from .demo import match_laws as rule_match
-        matched_laws = rule_match(facts)
-
-    # ---------- Step 3b: 骨架（快） ----------
-    pub("正在起草投诉信骨架", 0.42)
-    skeleton = _generate_skeleton(facts, matched_laws)
-    pub("投诉信骨架已生成", 0.55, skeleton)
-
-    # ---------- Step 3 + Step 6: 完整文书与话术并行 ----------
+    # ---------- Step 1 ∥ Step 2: 事实提取与法律匹配并行 ----------
     from concurrent.futures import ThreadPoolExecutor
-    pub("正在生成完整文书", 0.62)
+    pub("正在梳理维权要点并匹配法律", 0.15)
+    # 法律检索只依赖用户原话（不依赖结构化事实），因此与事实提取并行执行，
+    # 把两次模型调用的等待重叠起来。
     with ThreadPoolExecutor(max_workers=2) as pool:
+        facts_future = pool.submit(_extract_facts, raw_text, order_info)
+        laws_future = pool.submit(_match_laws, {"issue_description": raw_text[:300]}, raw_text)
+
+        # ---------- Step 1: 事实提取 ----------
+        try:
+            facts = facts_future.result()
+            if not facts.get("issue_description"):
+                raise ValueError("事实提取结果为空")
+        except Exception as e:
+            logger.warning("LLM 事实提取失败，降级规则提取：%s", e)
+            from .demo import extract_facts as rule_extract
+            facts = rule_extract(raw_text, order_info)
+
+        # ---------- Step 2: 法律匹配 ----------
+        try:
+            matched_laws = _validate_matched_laws(laws_future.result())
+            if not matched_laws:
+                raise ValueError("法律匹配为空或未通过校验")
+        except Exception as e:
+            logger.warning("LLM 法律匹配失败，降级规则匹配：%s", e)
+            from .demo import match_laws as rule_match
+            matched_laws = rule_match(facts)
+    pub("法律条文已匹配", 0.30)
+
+    # ---------- Step 3b ∥ Step 3 ∥ Step 6: 骨架 / 完整文书 / 话术 三路并行 ----------
+    # 骨架只是为了让用户早点看到内容，不必等它完成再开文书，所以一起提交。
+    pub("正在起草投诉信骨架", 0.42)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        skeleton_future = pool.submit(_generate_skeleton, facts, matched_laws)
         letter_future = pool.submit(_generate_complaint_letter, facts, matched_laws)
         script_future = pool.submit(_generate_negotiation_script, facts, matched_laws)
+
+        try:
+            skeleton = skeleton_future.result() or ""
+            if skeleton:
+                pub("投诉信骨架已生成", 0.55, skeleton)
+        except Exception as e:
+            logger.warning("骨架生成失败（不影响完整文书）：%s", e)
+
+        pub("正在生成完整文书", 0.62)
 
         try:
             result = letter_future.result()
@@ -711,21 +837,37 @@ def generate_complaint_progressive(
             from .demo import generate_negotiation_script as rule_script
             negotiation_script = rule_script(facts, matched_laws)
 
-    # 代码级兜底：清除编造信息 + 确保引用正确法条
-    if result.get("complaint_letter"):
-        result["complaint_letter"] = _sanitize_letter(result["complaint_letter"], facts)
-        result["complaint_letter"] = _ensure_law_cited(result["complaint_letter"], matched_laws)
-
     # Step 4: 商家资质建议（规则驱动）
     result["merchant_qualification_advice"] = get_merchant_qualification_advice(facts)
 
     # ---------- Step 5: 自我审查 ----------
-    pub("正在质检并优化文书", 0.80)
+    # 规则初筛通过则跳过模型质检：省下一次 10 秒级的模型调用，保证大多数请求更快
+
     try:
-        result = _self_review(result, facts, matched_laws)
+        need_review, review_issues = _letter_needs_review(result.get("complaint_letter", ""), facts, matched_laws)
+        if settings.llm_always_review or need_review:
+            if need_review:
+                logger.info("质检触发（规则初筛命中）：%s", "；".join(review_issues))
+            pub("正在质检并优化文书", 0.80)
+            result = _self_review(result, facts, matched_laws)
+        else:
+            logger.info("规则初筛通过，跳过模型质检以降低耗时")
     except Exception as e:
         logger.warning("自我审查失败，保留原结果：%s", e)
 
+    # 跳过质检时，建议项由缺失字段生成（与规则管线保持一致）
+    if not result.get("suggestions"):
+        missing = facts.get("missing_fields") or []
+        result["suggestions"] = (
+            [f"建议补充：{item}" for item in missing]
+            if missing
+            else ["信息完整，可提交至12315平台。建议保留订单截图、支付凭证与聊天记录作为证据。"]
+        )
+
+    # 代码级兜底：放在质检之后，质检若重写了文书，同样要过一遍防编造净化
+    if result.get("complaint_letter"):
+        result["complaint_letter"] = _sanitize_letter(result["complaint_letter"], facts)
+        result["complaint_letter"] = _ensure_law_cited(result["complaint_letter"], matched_laws)
     result["category"] = facts.get("category", "其他")
     result["channel_advice"] = get_channel_advice(facts, matched_laws)
     result["negotiation_script"] = negotiation_script

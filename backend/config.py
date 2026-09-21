@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     llm_model: str = "qwen-plus"
     # 快速模型（用于事实提取/法律匹配/质检等结构化步骤，显著降低耗时）
     llm_fast_model: str = "qwen-flash"
+    # 是否强制每次都跑模型质检：默认 False，由规则初筛决定是否触发（省一次 10 秒级调用）
+    llm_always_review: bool = False
     llm_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
