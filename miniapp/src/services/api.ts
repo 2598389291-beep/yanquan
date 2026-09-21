@@ -32,7 +32,7 @@ let cloudReady = false
 let cloudInitError = ''
 let cloudService = '' // 缓存实际可用的云托管服务名
 let cloudEnv = '' // 缓存实际可用的云开发环境 ID
-export function initCloud() {
+export async function initCloud() {
   if (process.env.TARO_ENV === 'h5') return
   try {
     if (!Taro.cloud) {
@@ -40,7 +40,8 @@ export function initCloud() {
       console.warn('[Cloud] Taro.cloud 不存在')
       return
     }
-    Taro.cloud.init(CLOUD_ENV ? { env: CLOUD_ENV } : {})
+    // 等待初始化完成再置位，避免启动首请求撞上“云未初始化”
+    await Taro.cloud.init(CLOUD_ENV ? { env: CLOUD_ENV } : {})
     cloudReady = true
   } catch (e: any) {
     cloudInitError = e?.errMsg || e?.message || String(e)
@@ -68,6 +69,69 @@ const getUserId = (): string => {
   return uid
 }
 
+/** 业务/接口错误（后端已返回明确信息），与网络错误区分，避免重复弹窗 */
+class ApiError extends Error {
+  constructor(msg: string) {
+    super(msg)
+    this.name = 'ApiError'
+  }
+}
+
+/** 请求可选参数：silent=true 用于后台加载/静默轮询，失败不打扰用户 */
+export interface ReqOptions extends Partial<Taro.request.Option> {
+  silent?: boolean
+}
+
+const CLOUD_TIMEOUT = 30000 // 云调用单次超时（冷启动较慢，放宽到 30s）
+const isH5 = process.env.TARO_ENV === 'h5'
+const isWeapp = process.env.TARO_ENV === 'weapp'
+
+let lastToastAt = 0
+/** 3 秒内最多弹一次错误，避免启动时多请求并发失败刷屏 */
+function safeToast(title: string) {
+  const now = Date.now()
+  if (now - lastToastAt < 3000) return
+  lastToastAt = now
+  Taro.showToast({ title, icon: 'none', duration: 3000 })
+}
+
+/** 是否允许直连公网域名兜底：仅 H5 / 开发者工具。真机正式版一律走云调用，不再请求未备案域名 */
+function canDirectFallback(): boolean {
+  if (isH5) return true
+  if (isWeapp) {
+    try {
+      return Taro.getSystemInfoSync().platform === 'devtools'
+    } catch {
+      return false
+    }
+  }
+  return false
+}
+
+/** 判断是否瞬时网络错误（超时/断网等，重试一次有意义；带错误码的配置类错误不重试） */
+function isTransientError(e: any): boolean {
+  const reason = String(e?.errMsg || e?.message || e || '').toLowerCase()
+  if (reason.includes('timeout') || reason.includes('abort') || reason.includes('econn') || reason.includes('enotfound') || reason.includes('getaddrinfo') || reason.includes('socket')) return true
+  const code = Number(e?.errCode)
+  if (code && code < 0) return false // 配置/权限类错误（如 INVALID_PATH），重试无意义
+  return reason.includes('request:fail') || reason.includes('callcontainer:fail') || reason.includes('network') || reason.includes('500') || reason.includes('502') || reason.includes('503')
+}
+
+/** 云调用失败时给用户的提示：真机上不出现“开发者工具勾选”这类无效指引 */
+function cloudFailTitle(e: any, directAllowed: boolean): string {
+  const reason = String(e?.errMsg || e?.message || e || '')
+  const code = e?.errCode ? `[${e.errCode}] ` : ''
+  if (code && (reason.includes('invalid_path') || Number(e.errCode) === -601031)) {
+    return '云调用路径配置有误，请检查云托管服务名与 X-WX-SERVICE'
+  }
+  if (reason.includes('url not in domain list')) {
+    return directAllowed ? '域名被拦截：请在开发者工具勾选「不校验合法域名」后重新编译' : '网络请求被拦截，请稍后重试'
+  }
+  if (isTransientError(e)) return '网络连接不稳定，请稍后重试'
+  const short = reason.replace(/^cloud\.callcontainer:fail\s*/i, '').replace(/^request:fail\s*/i, '').replace(/^errmsg\s*/i, '').slice(0, 40)
+  return short ? `云服务暂时不可用（${short}），请稍后重试` : '云服务暂时不可用，请稍后重试'
+}
+
 /** 把请求失败原因转成用户能看懂的话 */
 function friendlyNetworkError(reason: string): string {
   if (!reason) return '网络请求失败，请重试'
@@ -85,8 +149,11 @@ function friendlyNetworkError(reason: string): string {
 
 export async function request<T = any>(
   url: string,
-  options: Partial<Taro.request.Option> = {}
+  options: ReqOptions = {}
 ): Promise<T> {
+  const silent = options.silent === true
+  const reqOptions = { ...options } as any
+  delete reqOptions.silent
   let fullUrl = ''
   try {
     if (useCloud()) {
@@ -97,12 +164,20 @@ export async function request<T = any>(
       // 查询参数原样保留在 path 中，data 作为请求体
       const cloudData: Record<string, any> = { ...((options.data || {}) as any) }
       const cloudPath = url.startsWith('/') ? url : `/${url}`
-
-      const envCandidates = cloudEnv ? [cloudEnv] : [CLOUD_ENV, ...CLOUD_ENV_FALLBACKS]
-      const svcCandidates = cloudService ? [cloudService] : [CLOUD_SERVICE, 'yanquan-backend-011']
+      // 候选组合：已记住的可用环境/服务优先，其余按官方配置与历史后备逐个尝试
+      const allEnvs = [CLOUD_ENV, ...CLOUD_ENV_FALLBACKS]
+      const allSvcs = [CLOUD_SERVICE, 'yanquan-backend-011']
+      const pairs: Array<[string, string]> = []
+      const pushPair = (env: string, svc: string) => {
+        if (!pairs.some((p) => p[0] === env && p[1] === svc)) pairs.push([env, svc])
+      }
+      if (cloudEnv && cloudService) pushPair(cloudEnv, cloudService)
+      for (const env of allEnvs) for (const svc of allSvcs) pushPair(env, svc)
       let lastErr: any = null
-      for (const env of envCandidates) {
-        for (const svc of svcCandidates) {
+      // 超时/断网类错误自动重试一轮；配置类错误（带 errCode）不空转
+      for (let round = 0; round < 2; round++) {
+        let anyTransient = false
+        for (const [env, svc] of pairs) {
           try {
             const res = await Taro.cloud.callContainer({
               config: { env } as any,
@@ -114,6 +189,7 @@ export async function request<T = any>(
                 ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
               },
               data: cloudData,
+              timeout: CLOUD_TIMEOUT,
             })
             const sc = (res as any).statusCode || 200
             const data = res.data as ApiResp<T>
@@ -121,29 +197,31 @@ export async function request<T = any>(
               cloudEnv = env // 记住可用环境
               cloudService = svc // 记住可用服务名
               if (data.code === 0) return data.data
-              if (sc === 404) {
-                const detail = (data as any)?.detail || ''
-                console.error('[API] 404:', url, JSON.stringify(data))
-                Taro.showToast({ title: detail ? `接口404：${detail}` : '接口404：请检查云调用配置', icon: 'none', duration: 3000 })
-                throw new Error('接口404')
-              }
               const msg = data?.detail || data?.message || '请求失败'
-              console.error('[API] 错误:', url, sc, msg)
-              Taro.showToast({ title: msg, icon: 'none' })
-              throw new Error(msg)
+              console.error('[API] 业务错误:', url, sc, msg)
+              if (!silent) safeToast(msg)
+              throw new ApiError(msg) // 业务错误：提示一次即止，不再重试其他组合
             }
             lastErr = new Error(`网关响应异常 status=${sc}`)
           } catch (e) {
             lastErr = e
+            if (isTransientError(e)) anyTransient = true
+            if (e instanceof ApiError) throw e
           }
         }
+        if (!anyTransient) break // 无瞬时错误（如配置类）时不再空转第二轮
       }
       if (lastErr) {
-        // 云调用全部失败：开发者工具里直连公网兜底，保证能预览（正式发布仍以云调用为准）
-        console.warn('[API] 云调用失败，尝试直连兜底:', lastErr)
-        Taro.showToast({ title: '云调用暂不可用，已切换直连模式', icon: 'none', duration: 2500 })
+        console.warn('[API] 云调用全部失败:', lastErr)
+        // 真机正式版：云调用是唯一通道，不再请求未备案的公网域名（会被域名白名单拦截）
+        if (!canDirectFallback()) {
+          if (!silent) safeToast(cloudFailTitle(lastErr, false))
+          ;(lastErr as any)._toasted = true
+          throw lastErr
+        }
+        if (!silent) safeToast('云服务暂不可用，已切换直连模式')
       } else {
-        throw new Error('云调用失败')
+        throw new ApiError('云调用失败')
       }
     }
 
@@ -156,27 +234,27 @@ export async function request<T = any>(
         ...(options.header || {}),
         ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
       },
-      ...options,
+      ...reqOptions,
     })
     const data = res.data as ApiResp<T>
     if (data.code === 0) {
       return data.data
     }
     const msg = data.detail || data.message || '请求失败'
-    console.error('[API] 错误:', fullUrl, msg)
-    Taro.showToast({ title: msg, icon: 'none' })
-    throw new Error(msg)
+    console.error('[API] 业务错误:', fullUrl, msg)
+    if (!silent) safeToast(msg)
+    throw new ApiError(msg)
   } catch (e: any) {
     const reason = e?.errMsg || e?.message || String(e)
-    console.error('[API] 网络异常:', fullUrl || url, reason)
-    if (e?.errMsg || e?.message) {
-      const short = (e?.errCode ? `[${e.errCode}] ` : '') + reason
+    console.error('[API] 请求失败:', fullUrl || url, reason)
+    // 业务错误只在抛出前提示过一次；网络错误在此按模式给友好提示
+    if (!(e instanceof ApiError) && !silent && !(e as any)?._toasted) {
       const title = useCloud()
-        ? `云调用失败：${short}${String(reason).includes('INVALID_PATH') || e?.errCode === -601031 ? '（请确认云托管服务名与 X-WX-SERVICE 一致）' : ''}`
+        ? cloudFailTitle(e, canDirectFallback())
         : cloudInitError
-          ? `云初始化失败(${cloudInitError.slice(0, 30)})：${friendlyNetworkError(reason)}`
-          : `直连模式：${friendlyNetworkError(reason)}`
-      Taro.showToast({ title, icon: 'none', duration: 3500 })
+          ? `服务初始化失败：${friendlyNetworkError(reason)}`
+          : friendlyNetworkError(reason)
+      safeToast(title)
     }
     throw e
   }
@@ -200,10 +278,11 @@ export const emailLogin = (email: string, password: string) =>
     data: { email, password },
   })
 
-export const wechatLogin = (code: string, nickname: string = '') =>
+export const wechatLogin = (code: string, nickname: string = '', silentLogin: boolean = false) =>
   request<LoginData>('/api/auth/wechat/login', {
     method: 'POST',
     data: { code, nickname },
+    silent: silentLogin === true,
   })
 
 // 轻回访：提交最终处理结果（不打扰，一次即可）
@@ -225,7 +304,7 @@ export interface MetaInfo {
   stats?: { laws: number; scenarios: number; templates: number; cases: number }
 }
 
-export const getMeta = () => request<MetaInfo>('/api/meta', { method: 'GET' })
+export const getMeta = () => request<MetaInfo>('/api/meta', { method: 'GET', silent: true })
 
 export interface UsageInfo {
   total: number
@@ -235,7 +314,7 @@ export interface UsageInfo {
 }
 
 export const getUsage = () =>
-  request<UsageInfo>(`/api/usage?user_id=${encodeURIComponent(getUserId())}`, { method: 'GET' })
+  request<UsageInfo>(`/api/usage?user_id=${encodeURIComponent(getUserId())}`, { method: 'GET', silent: true })
 
 // ---------- 任务式生成（先出骨架，边生成边补全） ----------
 
@@ -262,7 +341,7 @@ export const createVoiceTaskByUrl = (audioUrl: string, audioName: string, orderI
   })
 
 export const getTaskStatus = (taskId: string) =>
-  request<TaskInfo>(`/api/complaint/task/${taskId}`, { method: 'GET' })
+  request<TaskInfo>(`/api/complaint/task/${taskId}`, { method: 'GET', silent: true })
 
 // 读取本地文件为 base64（语音兜底转写用）
 export const readFileAsBase64 = (filePath: string): Promise<string> =>
@@ -536,7 +615,7 @@ export interface GuideScenario {
 }
 
 export const getGuideScenarios = () =>
-  request<{ scenarios: GuideScenario[] }>('/api/guide/scenarios', { method: 'GET' })
+  request<{ scenarios: GuideScenario[] }>('/api/guide/scenarios', { method: 'GET', silent: true })
 
 export interface CommonTemplate {
   key: string
@@ -551,7 +630,7 @@ export interface CommonTemplate {
 }
 
 export const getCommonTemplates = () =>
-  request<{ templates: CommonTemplate[] }>('/api/guide/templates', { method: 'GET' })
+  request<{ templates: CommonTemplate[] }>('/api/guide/templates', { method: 'GET', silent: true })
 
 export interface ReferenceCase {
   key: string
@@ -566,7 +645,7 @@ export interface ReferenceCase {
 }
 
 export const getReferenceCases = () =>
-  request<{ cases: ReferenceCase[] }>('/api/guide/cases', { method: 'GET' })
+  request<{ cases: ReferenceCase[] }>('/api/guide/cases', { method: 'GET', silent: true })
 
 // ---------- 行动清单 / 证据清单 / 决策矩阵 ----------
 
@@ -599,13 +678,13 @@ export interface DecisionChannel {
 }
 
 export const getEvidenceChecklist = (scenario: string) =>
-  request<EvidenceChecklist>(`/api/guide/evidence-checklist?scenario=${scenario}`, { method: 'GET' })
+  request<EvidenceChecklist>(`/api/guide/evidence-checklist?scenario=${scenario}`, { method: 'GET', silent: true })
 
 export const getEvidenceScenarios = () =>
-  request<{ scenarios: { key: string; title: string; icon: string }[] }>('/api/guide/evidence-scenarios', { method: 'GET' })
+  request<{ scenarios: { key: string; title: string; icon: string }[] }>('/api/guide/evidence-scenarios', { method: 'GET', silent: true })
 
 export const getScenarioDecisions = () =>
-  request<{ decisions: Record<string, DecisionChannel[]> }>('/api/guide/scenarios/decision', { method: 'GET' })
+  request<{ decisions: Record<string, DecisionChannel[]> }>('/api/guide/scenarios/decision', { method: 'GET', silent: true })
 
 // 生成结果附加字段（后端 _build_response_data 自动挂载）
 export interface ActionGuideFields {
@@ -626,7 +705,6 @@ export interface ActionGuideFields {
     reason: string
   }[]
 }
-  request<{ cases: ReferenceCase[] }>('/api/guide/cases', { method: 'GET' })
 
 // ---------- 法律知识库 ----------
 
@@ -639,7 +717,7 @@ export interface LawItem {
   source_url: string
 }
 
-export const getLaws = () => request<{ laws: LawItem[] }>('/api/laws', { method: 'GET' })
+export const getLaws = () => request<{ laws: LawItem[] }>('/api/laws', { method: 'GET', silent: true })
 
 // ---------- 反馈 ----------
 
@@ -651,10 +729,10 @@ export const submitFeedback = (complaint_id: number, rating: string, comment: st
 
 // ---------- 记录 ----------
 
-export const getComplaintList = (page = 1, page_size = 20, status = 'all') =>
+export const getComplaintList = (page = 1, page_size = 20, status = 'all', opts: ReqOptions = {}) =>
   request<ComplaintListResp>(
     `/api/complaints?user_id=${getUserId()}&page=${page}&page_size=${page_size}&status=${status}`,
-    { method: 'GET' }
+    { method: 'GET', silent: true, ...opts }
   )
 
 export const getComplaintDetail = (id: number) =>

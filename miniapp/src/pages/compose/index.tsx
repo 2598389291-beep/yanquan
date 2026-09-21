@@ -115,6 +115,7 @@ const ComposePage: React.FC = () => {
   // 轮询任务式生成：先展示骨架，完成后返回完整结果
   const pollTask = (taskId: string): Promise<ComplaintDetail> =>
     new Promise((resolve, reject) => {
+      let failCount = 0
       const tick = async () => {
         if (abortedRef.current) {
           reject(new Error('已取消'))
@@ -134,9 +135,16 @@ const ComposePage: React.FC = () => {
             reject(new Error(t.error || '生成失败，请重试'))
             return
           }
+          failCount = 0
           setTimeout(tick, 2000)
         } catch (e) {
-          reject(e)
+          // 单次轮询网络抖动不中断生成：连续失败 3 次才放弃
+          failCount += 1
+          if (failCount >= 3) {
+            reject(e)
+            return
+          }
+          setTimeout(tick, 2500)
         }
       }
       tick()

@@ -9,7 +9,7 @@ async function silentLogin() {
   try {
     const { code } = await Taro.login()
     if (!code) return
-    const data = await wechatLogin(code, '')
+    const data = await wechatLogin(code, '', true) // 静默登录：失败不弹窗打扰
     Taro.setStorageSync('token', data.token)
     Taro.setStorageSync('user_id', String(data.user_id))
     Taro.setStorageSync('nickname', data.nickname || '')
@@ -21,8 +21,7 @@ async function silentLogin() {
 function App({ children }) {
 
   useLaunch(() => {
-    initCloud()
-    silentLogin()
+    initCloud().then(() => silentLogin())
   })
   return children
 }
