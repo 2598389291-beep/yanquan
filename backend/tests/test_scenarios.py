@@ -107,6 +107,30 @@ def test_validate_matched_laws_filters_hallucination():
     assert "欺诈" in filtered[0]["content"], "应使用知识库原文覆盖"
 
 
+def test_validate_matched_laws_accepts_model_format():
+    """模型常把名称写成《XX法》第55条、条号写成中文数字：需归一化后仍能命中知识库"""
+    matched = [
+        {"law_name": "《消费者权益保护法》第55条", "article": "第55条", "content": "模型自己写的内容"},
+        {"law_name": "中华人民共和国消费者权益保护法", "article": "第二十四条", "content": "模型自己写的内容"},
+    ]
+    filtered = _validate_matched_laws(matched)
+    assert len(filtered) == 2, "归一化后应全部命中知识库"
+    names = {(law["law_name"], law["article"]) for law in filtered}
+    assert ("消费者权益保护法", "第55条") in names
+    assert ("消费者权益保护法", "第24条") in names, "中文条号应转成阿拉伯数字"
+    for law in filtered:
+        assert "模型自己写的内容" not in law["content"], "内容必须用知识库原文覆盖"
+
+
+def test_validate_matched_laws_dedupes_same_article():
+    """同一法条用不同写法重复返回时，应去重"""
+    matched = [
+        {"law_name": "消费者权益保护法", "article": "第55条", "content": "A"},
+        {"law_name": "《消费者权益保护法》第55条", "article": "第55条", "content": "B"},
+    ]
+    assert len(_validate_matched_laws(matched)) == 1
+
+
 def test_llm_total_failure_falls_back(monkeypatch):
     """LLM 全线失败时，管线自动降级为规则生成，不崩溃"""
     from backend.config import settings

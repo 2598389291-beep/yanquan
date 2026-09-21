@@ -115,23 +115,89 @@ def _external_law_match(facts: dict) -> Optional[list]:
     return None
 
 
+# 把模型输出的法条名称/条号归一化到知识库的规范格式：
+# 《消费者权益保护法》第55条 → (消费者权益保护法, 第55条)
+# 中华人民共和国消费者权益保护法 + 第二十三条 → (消费者权益保护法, 第23条)
+_ARTICLE_RE = re.compile(r"第[〇零一二三四五六七八九十百千0-9]+条(?:之[一二三四五六七八九十]+)?")
+_CN_DIGITS = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
+              "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+_CN_UNITS = {"十": 10, "百": 100, "千": 1000}
+
+
+def _cn_number_to_int(text: str) -> Optional[int]:
+    """中文数字转阿拉伯数字（十/十五/二十三/一百零八）；无法解析返回 None"""
+    if not text:
+        return None
+    if text.isdigit():
+        return int(text)
+    total, current, seen = 0, 0, False
+    for ch in text:
+        if ch in _CN_DIGITS:
+            current = _CN_DIGITS[ch]
+            seen = True
+        elif ch in _CN_UNITS:
+            total += (current or 1) * _CN_UNITS[ch]
+            current = 0
+            seen = True
+        else:
+            return None
+    return total + current if seen else None
+
+
+def normalize_law_name(name: str) -> str:
+    """去掉书名号/括号/空格、去掉「中华人民共和国」前缀、剔除混进来的条号"""
+    text = _ARTICLE_RE.sub("", name or "")
+    text = re.sub(r"[《》【】\[\]（）()\s]", "", text)
+    if text.startswith("中华人民共和国"):
+        text = text[len("中华人民共和国"):]
+    return text
+
+
+def normalize_article(article: str) -> str:
+    """统一成「第N条」（阿拉伯数字），无法解析时原样返回（会被白名单拦下）"""
+    text = article or ""
+    match = _ARTICLE_RE.search(text)
+    token = match.group(0) if match else text
+    number = _cn_number_to_int(re.sub(r"[第条之\s]", "", token))
+    return f"第{number}条" if number is not None else re.sub(r"\s", "", text)
+
+
 def _validate_matched_laws(matched: list) -> list:
-    """过滤 LLM 返回的法条，仅保留知识库中真实存在的条文（防幻觉）"""
+
+
+    """过滤 LLM 返回的法条，仅保留知识库中真实存在的条文（防幻觉）
+
+    LLM 常见的格式差异（《》、「中华人民共和国」前缀、条号写成中文数字、
+    把条号混进法律名称）都先归一化，再与知识库精确比对；命中后一律用知识库
+    原文覆盖模型输出，保证引用可溯源、不幻觉。
+    """
     kb = get_legal_knowledge()
-    valid = {(law["law_name"], law["article"]) for law in kb}
-    filtered = []
+    index = {
+        (normalize_law_name(law["law_name"]), normalize_article(law["article"])): law
+        for law in kb
+    }
+    filtered: list = []
+    seen: set = set()
     for law in matched or []:
         if not isinstance(law, dict):
             continue
-        name = law.get("law_name") or ""
-        article = law.get("article") or ""
-        if (name, article) in valid:
-            # 用知识库原文覆盖，保证内容准确
-            for k in kb:
-                if k["law_name"] == name and k["article"] == article:
-                    law["content"] = k["content"]
-                    break
-            filtered.append(law)
+        name = normalize_law_name(law.get("law_name") or "")
+        # 有些模型只填了 law_name（含条号），article 为空，这里兜底再解析一次
+        article = normalize_article(law.get("article") or law.get("law_name") or "")
+        hit = index.get((name, article))
+        if not hit:
+            continue
+        key = (hit["law_name"], hit["article"])
+        if key in seen:
+            continue
+        seen.add(key)
+        # 统一为知识库的规范名称/条号/原文
+        filtered.append({
+            **law,
+            "law_name": hit["law_name"],
+            "article": hit["article"],
+            "content": hit["content"],
+        })
     return filtered
 
 
@@ -180,7 +246,7 @@ def _match_laws(facts: dict) -> list:
         "4. 如果没有任何法律条文与用户问题相关，返回空数组\n\n"
         "严格按照以下 JSON 格式输出，只输出一个数组：\n"
         '[\n'
-        '    {"law_name": "法律名称", "article": "第X条", "content": "法律条文原文", "relevance_reason": "选择该条文的理由"}\n'
+        '    {"law_name": "法律名称（不要书名号、不要带条号，例如：消费者权益保护法）", "article": "第X条（用阿拉伯数字，例如：第55条）", "content": "法律条文原文", "relevance_reason": "选择该条文的理由"}\n'
         "]"
     )
 
