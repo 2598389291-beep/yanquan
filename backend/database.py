@@ -132,27 +132,45 @@ def _migrate(conn: sqlite3.Connection):
 def _seed_legal_knowledge(cursor):
     """预置法律条文（覆盖消费者权益全场景，来自公开法律法规）
 
-    按「法律名称 + 条号」补齐缺失条文，而不是"表非空就跳过"：
-    否则知识库后续扩充（例如 21 条 → 108 条）时，老库永远拿不到新增条文。
+    按「法律名称 + 条号」做 upsert：
+    - 缺失的条文 → 插入（否则老库拿不到知识库扩充，例如 21 条 → 108 条）
+    - 已有但内容/标签变了的 → 更新（否则修正过的条文永远停留在旧版本）
+    "表非空就跳过"会让上面两种情况都失效，法条内容错了也发现不了。
     """
     from .services.law_seed import LAW_SEED
 
-    cursor.execute("SELECT law_name, article FROM legal_knowledge")
-    existing = {(row[0], row[1]) for row in cursor.fetchall()}
+    cursor.execute("SELECT id, law_name, article, content, tags FROM legal_knowledge")
+    existing = {(row[1], row[2]): row for row in cursor.fetchall()}
 
-    added = 0
+    added = updated = 0
     for law_name, article, content, tags in LAW_SEED:
-        if (law_name, article) in existing:
-            continue
         tag_list = json.dumps([t.strip() for t in tags.split(",") if t.strip()], ensure_ascii=False)
-        cursor.execute(
-            "INSERT INTO legal_knowledge (law_name, article, content, tags) VALUES (?, ?, ?, ?)",
-            (law_name, article, content, tag_list),
-        )
-        added += 1
-    if added:
+        row = existing.get((law_name, article))
+        if row is None:
+            cursor.execute(
+                "INSERT INTO legal_knowledge (law_name, article, content, tags) VALUES (?, ?, ?, ?)",
+                (law_name, article, content, tag_list),
+            )
+            added += 1
+            continue
+        old_content, old_tags = row[3], row[4]
+        try:
+            same_tags = json.loads(old_tags or "[]") == json.loads(tag_list)
+        except (json.JSONDecodeError, TypeError):
+            same_tags = False
+        if old_content != content or not same_tags:
+            cursor.execute(
+                "UPDATE legal_knowledge SET content = ?, tags = ? WHERE id = ?",
+                (content, tag_list, row[0]),
+            )
+            updated += 1
+
+    if added or updated:
         import logging
-        logging.getLogger(__name__).info("法律知识库补齐 %s 条（现共 %s 条）", added, len(existing) + added)
+        logging.getLogger(__name__).info(
+            "法律知识库同步：新增 %s 条，更新 %s 条（现共 %s 条）",
+            added, updated, len(existing) + added,
+        )
 
 
 def get_legal_knowledge(tags: Optional[list] = None) -> list:

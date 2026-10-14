@@ -22,6 +22,32 @@ def test_initial_status():
     assert record["status"] == "generated"
 
 
+def test_seed_syncs_changed_article():
+    """知识库条文被修正后，已存在的库应被更新，而不是停留在旧内容。
+
+    背景：老实现是"表非空就跳过"，导致法条内容和标签改过之后，
+    已有数据库永远拿不到新版本（线上重建库才碰巧是新的）。
+    """
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE legal_knowledge SET content = '旧内容', tags = '[\"旧标签\"]' "
+        "WHERE law_name = '食品安全法' AND article = '第148条'"
+    )
+    conn.commit()
+
+    db._seed_legal_knowledge(cursor)
+    conn.commit()
+
+    row = cursor.execute(
+        "SELECT content, tags FROM legal_knowledge WHERE law_name = '食品安全法' AND article = '第148条'"
+    ).fetchone()
+    conn.close()
+
+    assert "十倍" in row["content"], "内容应被知识库最新版本覆盖"
+    assert row["tags"] != '["旧标签"]', "标签也应同步更新"
+
+
 def test_status_flow():
     record = _make_complaint()
     for new_status in ("copied", "submitted", "following_up", "resolved"):
