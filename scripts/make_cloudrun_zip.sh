@@ -13,7 +13,8 @@ rsync -a --exclude '.env' --exclude 'data' --exclude '__pycache__' \
 
 cd scripts/cloudrun
 rm -f ../yanquan-cloudrun.zip
-zip -qr ../yanquan-cloudrun.zip .
+# 排除 macOS 元数据文件，避免它们进入部署包
+zip -qr ../yanquan-cloudrun.zip . -x '*.DS_Store' -x '__MACOSX/*'
 cd ..
 echo "已生成：$(pwd)/yanquan-cloudrun.zip"
 ls -la yanquan-cloudrun.zip
