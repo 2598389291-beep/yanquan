@@ -106,7 +106,9 @@ def _migrate(conn: sqlite3.Connection):
     # users 表升级：新增 email / password_hash，phone 放开唯一约束（微信/邮箱用户可无手机号）
     user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
     if "email" not in user_cols:
-        conn.execute("""
+        # 注意：必须用 executescript —— sqlite3 的 execute 一次只能执行一条语句，
+        # 旧库触发这条迁移分支时若用 execute 会直接抛错、导致服务启动失败。
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS users_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 phone TEXT,
@@ -124,21 +126,33 @@ def _migrate(conn: sqlite3.Connection):
             DROP TABLE users;
             ALTER TABLE users_new RENAME TO users;
         """)
+        conn.commit()
 
 
 def _seed_legal_knowledge(cursor):
-    """预置法律条文（覆盖消费者权益全场景，来自公开法律法规）"""
-    cursor.execute("SELECT COUNT(*) FROM legal_knowledge")
-    if cursor.fetchone()[0] > 0:
-        return
+    """预置法律条文（覆盖消费者权益全场景，来自公开法律法规）
 
+    按「法律名称 + 条号」补齐缺失条文，而不是"表非空就跳过"：
+    否则知识库后续扩充（例如 21 条 → 108 条）时，老库永远拿不到新增条文。
+    """
     from .services.law_seed import LAW_SEED
+
+    cursor.execute("SELECT law_name, article FROM legal_knowledge")
+    existing = {(row[0], row[1]) for row in cursor.fetchall()}
+
+    added = 0
     for law_name, article, content, tags in LAW_SEED:
+        if (law_name, article) in existing:
+            continue
         tag_list = json.dumps([t.strip() for t in tags.split(",") if t.strip()], ensure_ascii=False)
         cursor.execute(
             "INSERT INTO legal_knowledge (law_name, article, content, tags) VALUES (?, ?, ?, ?)",
             (law_name, article, content, tag_list),
         )
+        added += 1
+    if added:
+        import logging
+        logging.getLogger(__name__).info("法律知识库补齐 %s 条（现共 %s 条）", added, len(existing) + added)
 
 
 def get_legal_knowledge(tags: Optional[list] = None) -> list:
