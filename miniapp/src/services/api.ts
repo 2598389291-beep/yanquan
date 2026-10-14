@@ -16,13 +16,13 @@ export const BASE_URL = 'https://yanquan-backend-301468-10-1473499185.sh.run.tcl
 // ------------------------------------------------------------
 // 小程序端通过 wx.cloud.callContainer 直连云托管后端，
 // 不需要 request/uploadFile 合法域名。
-// CLOUD_ENV：填云开发环境 ID（云开发控制台首页可见，形如 yanquan-xxxx）
+// CLOUD_ENV：填**云托管环境 ID**（微信云托管控制台 → 设置 → 环境设置，形如 yanquan-xxxx）
 // 留空则使用默认环境。H5 预览仍走 BASE_URL（仅供开发预览）。
 // ============================================================
-// 当前 AppID 名下实际关联的环境是 mianfei-d4g7c7ar072ed8f65（devtools 云环境列表确认）
-// 之前填的 yanquan-d5g2at6al1211fff3 不在关联列表中，保留为自动尝试的后备
-export const CLOUD_ENV = 'mianfei-d4g7c7ar072ed8f65'
-export const CLOUD_ENV_FALLBACKS = ['yanquan-d5g2at6al1211fff3']
+// 2026-10-14 核对云托管控制台「环境设置」：环境 ID = yanquan-d5g2at6al1211fff3
+// （此前首选写成 mianfei-...，那是云开发 AI 能力所在的环境，会导致每次冷启动先试错一次）
+export const CLOUD_ENV = 'yanquan-d5g2at6al1211fff3'
+export const CLOUD_ENV_FALLBACKS = ['mianfei-d4g7c7ar072ed8f65']
 
 // 云托管服务名称（微信云托管控制台 → 服务管理 → 服务列表 → 服务名称）
 // 按官方文档，callContainer 必须在 header 带 X-WX-SERVICE，否则网关报 -601031 INVALID_PATH
@@ -166,7 +166,9 @@ export async function request<T = any>(
       const cloudPath = url.startsWith('/') ? url : `/${url}`
       // 候选组合：已记住的可用环境/服务优先，其余按官方配置与历史后备逐个尝试
       const allEnvs = [CLOUD_ENV, ...CLOUD_ENV_FALLBACKS]
-      const allSvcs = [CLOUD_SERVICE, 'yanquan-backend-011']
+      // 服务名以云托管控制台「服务列表」为准：yanquan-backend
+      // （此前还试过 yanquan-backend-011，那是版本名不是服务名，已移除以免每次多试一次）
+      const allSvcs = [CLOUD_SERVICE]
       const pairs: Array<[string, string]> = []
       const pushPair = (env: string, svc: string) => {
         if (!pairs.some((p) => p[0] === env && p[1] === svc)) pairs.push([env, svc])
