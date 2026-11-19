@@ -42,6 +42,7 @@ def init_db():
             nickname TEXT DEFAULT '',
             avatar TEXT DEFAULT '',
             password_hash TEXT DEFAULT '',
+            role TEXT NOT NULL DEFAULT 'consumer',
             token TEXT,
             token_expires_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -67,6 +68,9 @@ def init_db():
             order_info TEXT DEFAULT '{}',
             status TEXT DEFAULT 'generated',
             evidence TEXT DEFAULT '[]',
+            case_status TEXT NOT NULL DEFAULT 'pending_assignment',
+            assignee_id TEXT DEFAULT '',
+            claimed_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT (datetime('now','localtime'))
         );
 
@@ -87,6 +91,21 @@ def init_db():
             used_count INTEGER NOT NULL DEFAULT 0,
             updated_at TIMESTAMP DEFAULT (datetime('now','localtime'))
         );
+
+        CREATE TABLE IF NOT EXISTS case_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            complaint_id INTEGER NOT NULL,
+            actor_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            from_case_status TEXT DEFAULT '',
+            to_case_status TEXT DEFAULT '',
+            assignee_id TEXT DEFAULT '',
+            detail TEXT DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_case_events_complaint
+            ON case_events(complaint_id, created_at ASC, id ASC);
     """)
 
     # 老库迁移：补充 evidence 列
@@ -102,6 +121,14 @@ def _migrate(conn: sqlite3.Connection):
     cols = [row[1] for row in conn.execute("PRAGMA table_info(complaints)").fetchall()]
     if "evidence" not in cols:
         conn.execute("ALTER TABLE complaints ADD COLUMN evidence TEXT DEFAULT '[]'")
+    if "case_status" not in cols:
+        conn.execute(
+            "ALTER TABLE complaints ADD COLUMN case_status TEXT NOT NULL DEFAULT 'pending_assignment'"
+        )
+    if "assignee_id" not in cols:
+        conn.execute("ALTER TABLE complaints ADD COLUMN assignee_id TEXT DEFAULT ''")
+    if "claimed_at" not in cols:
+        conn.execute("ALTER TABLE complaints ADD COLUMN claimed_at TIMESTAMP")
 
     # users 表升级：新增 email / password_hash，phone 放开唯一约束（微信/邮箱用户可无手机号）
     user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
@@ -127,6 +154,31 @@ def _migrate(conn: sqlite3.Connection):
             ALTER TABLE users_new RENAME TO users;
         """)
         conn.commit()
+
+    if "role" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'consumer'")
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_complaints_ops_queue "
+        "ON complaints(case_status, assignee_id, created_at DESC)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS case_events ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "complaint_id INTEGER NOT NULL,"
+        "actor_id TEXT NOT NULL,"
+        "action TEXT NOT NULL,"
+        "from_case_status TEXT DEFAULT '',"
+        "to_case_status TEXT DEFAULT '',"
+        "assignee_id TEXT DEFAULT '',"
+        "detail TEXT DEFAULT '{}',"
+        "created_at TIMESTAMP DEFAULT (datetime('now','localtime'))"
+        ")"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_case_events_complaint "
+        "ON case_events(complaint_id, created_at ASC, id ASC)"
+    )
 
 
 def _seed_legal_knowledge(cursor):
@@ -309,6 +361,28 @@ STATUS_LABELS = {
     "abandoned": "已放弃",
 }
 
+VALID_ROLES = ("consumer", "agent", "admin")
+
+CASE_STATUSES = (
+    "pending_assignment", "in_progress", "waiting_user", "resolved", "closed",
+)
+
+CASE_STATUS_LABELS = {
+    "pending_assignment": "待认领",
+    "in_progress": "处理中",
+    "waiting_user": "待用户补充",
+    "resolved": "已解决",
+    "closed": "已关闭",
+}
+
+CASE_TRANSITIONS = {
+    "pending_assignment": {"in_progress", "closed"},
+    "in_progress": {"waiting_user", "resolved", "closed"},
+    "waiting_user": {"in_progress", "resolved", "closed"},
+    "resolved": {"in_progress", "closed"},
+    "closed": {"in_progress"},
+}
+
 
 def update_complaint_status(complaint_id: int, user_id: str, new_status: str) -> Optional[dict]:
     if new_status not in VALID_STATUSES:
@@ -330,13 +404,274 @@ def update_complaint_status(complaint_id: int, user_id: str, new_status: str) ->
     return dict(updated) if updated else None
 
 
+def _get_case_row(cursor: sqlite3.Cursor, complaint_id: int) -> Optional[sqlite3.Row]:
+    cursor.execute(
+        "SELECT c.*, u.nickname AS assignee_nickname, u.role AS assignee_role "
+        "FROM complaints c "
+        "LEFT JOIN users u ON CAST(u.id AS TEXT) = c.assignee_id "
+        "WHERE c.id = ?",
+        (complaint_id,),
+    )
+    return cursor.fetchone()
+
+
+def _append_case_event(
+    cursor: sqlite3.Cursor,
+    complaint_id: int,
+    actor_id: str,
+    action: str,
+    from_case_status: str = "",
+    to_case_status: str = "",
+    assignee_id: str = "",
+    detail: Optional[dict] = None,
+):
+    cursor.execute(
+        "INSERT INTO case_events "
+        "(complaint_id, actor_id, action, from_case_status, to_case_status, assignee_id, detail) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            complaint_id,
+            actor_id,
+            action,
+            from_case_status or "",
+            to_case_status or "",
+            assignee_id or "",
+            json.dumps(detail or {}, ensure_ascii=False),
+        ),
+    )
+
+
+def get_case_events(complaint_id: int) -> list:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT e.*, u.nickname AS actor_nickname "
+        "FROM case_events e "
+        "LEFT JOIN users u ON CAST(u.id AS TEXT) = e.actor_id "
+        "WHERE e.complaint_id = ? "
+        "ORDER BY e.created_at ASC, e.id ASC",
+        (complaint_id,),
+    ).fetchall()
+    conn.close()
+    items = []
+    for row in rows:
+        item = dict(row)
+        try:
+            item["detail"] = json.loads(item.get("detail") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            item["detail"] = {}
+        items.append(item)
+    return items
+
+
+def get_case_by_id(complaint_id: int) -> Optional[dict]:
+    conn = get_connection()
+    row = _get_case_row(conn.cursor(), complaint_id)
+    conn.close()
+    if not row:
+        return None
+    record = dict(row)
+    record["events"] = get_case_events(complaint_id)
+    return record
+
+
+def list_cases(
+    actor_id: str,
+    actor_role: str,
+    limit: int = 20,
+    offset: int = 0,
+    case_status: Optional[str] = None,
+    category: Optional[str] = None,
+    assignee_id: Optional[str] = None,
+    query: Optional[str] = None,
+) -> tuple[list, int]:
+    """运营案件列表。客服只看待认领和自己名下案件，管理员看全部。"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    where = ["1 = 1"]
+    params: list = []
+    if actor_role != "admin":
+        where.append("(c.assignee_id = ? OR c.assignee_id IS NULL OR c.assignee_id = '')")
+        params.append(actor_id)
+    elif assignee_id is not None:
+        where.append("c.assignee_id = ?")
+        params.append(assignee_id)
+    if case_status and case_status != "all":
+        where.append("c.case_status = ?")
+        params.append(case_status)
+    if category:
+        where.append("c.category = ?")
+        params.append(category)
+    if query:
+        where.append("c.raw_text LIKE ?")
+        params.append(f"%{query.strip()}%")
+    where_sql = " AND ".join(where)
+    cursor.execute(
+        "SELECT c.id, c.category, c.raw_text, c.status, c.case_status, "
+        "c.assignee_id, c.created_at, c.claimed_at, "
+        "u.nickname AS assignee_nickname "
+        "FROM complaints c "
+        "LEFT JOIN users u ON CAST(u.id AS TEXT) = c.assignee_id "
+        f"WHERE {where_sql} ORDER BY c.created_at DESC, c.id DESC LIMIT ? OFFSET ?",
+        params + [limit, offset],
+    )
+    rows = cursor.fetchall()
+    cursor.execute(f"SELECT COUNT(*) FROM complaints c WHERE {where_sql}", params)
+    total = cursor.fetchone()[0]
+    conn.close()
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["status_label"] = STATUS_LABELS.get(item.get("status", ""), item.get("status", ""))
+        item["case_status_label"] = CASE_STATUS_LABELS.get(
+            item.get("case_status", ""), item.get("case_status", "")
+        )
+        items.append(item)
+    return items, total
+
+
+def claim_case(complaint_id: int, actor_id: str) -> Optional[dict]:
+    """认领未分配案件；重复认领自己的案件保持幂等。"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    row = _get_case_row(cursor, complaint_id)
+    if not row:
+        conn.rollback()
+        conn.close()
+        return None
+    current_assignee = row["assignee_id"] or ""
+    if current_assignee and current_assignee != actor_id:
+        conn.rollback()
+        conn.close()
+        raise ValueError("案件已被其他客服认领")
+    if row["case_status"] in ("resolved", "closed"):
+        conn.rollback()
+        conn.close()
+        raise ValueError("已结束案件不能认领")
+    if current_assignee == actor_id:
+        conn.commit()
+        conn.close()
+        return get_case_by_id(complaint_id)
+
+    old_status = row["case_status"]
+    cursor.execute(
+        "UPDATE complaints SET assignee_id = ?, case_status = 'in_progress', "
+        "claimed_at = datetime('now','localtime') WHERE id = ?",
+        (actor_id, complaint_id),
+    )
+    _append_case_event(
+        cursor,
+        complaint_id,
+        actor_id,
+        "claimed",
+        from_case_status=old_status,
+        to_case_status="in_progress",
+        assignee_id=actor_id,
+    )
+    conn.commit()
+    conn.close()
+    return get_case_by_id(complaint_id)
+
+
+def assign_case(complaint_id: int, actor_id: str, assignee_id: str) -> Optional[dict]:
+    """管理员分派案件；要求目标账号属于客服或管理员角色。"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    target = cursor.execute(
+        "SELECT id, nickname, role FROM users WHERE id = ?", (assignee_id,)
+    ).fetchone()
+    if not target:
+        conn.close()
+        raise ValueError("目标客服不存在")
+    target_role = target["role"] or "consumer"
+    if settings.admin_user_id and str(target["id"]) == settings.admin_user_id:
+        target_role = "admin"
+    if target_role not in ("agent", "admin"):
+        conn.close()
+        raise ValueError("只能分派给客服或管理员")
+
+    cursor.execute("BEGIN IMMEDIATE")
+    row = _get_case_row(cursor, complaint_id)
+    if not row:
+        conn.rollback()
+        conn.close()
+        return None
+    if row["case_status"] in ("resolved", "closed"):
+        conn.rollback()
+        conn.close()
+        raise ValueError("已结束案件不能分派")
+    if (row["assignee_id"] or "") == assignee_id:
+        conn.commit()
+        conn.close()
+        return get_case_by_id(complaint_id)
+
+    old_status = row["case_status"]
+    next_status = "in_progress" if old_status == "pending_assignment" else old_status
+    cursor.execute(
+        "UPDATE complaints SET assignee_id = ?, case_status = ?, "
+        "claimed_at = COALESCE(claimed_at, datetime('now','localtime')) WHERE id = ?",
+        (assignee_id, next_status, complaint_id),
+    )
+    _append_case_event(
+        cursor,
+        complaint_id,
+        actor_id,
+        "assigned",
+        from_case_status=old_status,
+        to_case_status=next_status,
+        assignee_id=assignee_id,
+        detail={"previous_assignee_id": row["assignee_id"] or ""},
+    )
+    conn.commit()
+    conn.close()
+    return get_case_by_id(complaint_id)
+
+
+def transition_case(complaint_id: int, actor_id: str, new_status: str) -> Optional[dict]:
+    """按显式状态机推进案件，并记录操作日志。"""
+    if new_status not in CASE_STATUSES:
+        raise ValueError(f"无效案件状态：{new_status}")
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    row = _get_case_row(cursor, complaint_id)
+    if not row:
+        conn.rollback()
+        conn.close()
+        return None
+    old_status = row["case_status"]
+    if new_status not in CASE_TRANSITIONS.get(old_status, set()):
+        conn.rollback()
+        conn.close()
+        raise ValueError(f"不允许从 {old_status} 流转到 {new_status}")
+    cursor.execute(
+        "UPDATE complaints SET case_status = ? WHERE id = ?",
+        (new_status, complaint_id),
+    )
+    _append_case_event(
+        cursor,
+        complaint_id,
+        actor_id,
+        "status_changed",
+        from_case_status=old_status,
+        to_case_status=new_status,
+        assignee_id=row["assignee_id"] or "",
+    )
+    conn.commit()
+    conn.close()
+    return get_case_by_id(complaint_id)
+
+
 def delete_complaint(complaint_id: int, user_id: str) -> bool:
     """删除投诉记录（归属校验）"""
     conn = get_connection()
     cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
     cursor.execute("DELETE FROM complaints WHERE id = ? AND user_id = ?", (complaint_id, user_id))
-    conn.commit()
     deleted = cursor.rowcount > 0
+    if deleted:
+        cursor.execute("DELETE FROM case_events WHERE complaint_id = ?", (complaint_id,))
+    conn.commit()
     conn.close()
     return deleted
 
@@ -443,6 +778,35 @@ def get_user_by_phone(phone: str) -> Optional[dict]:
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def get_user_by_id(user_id: str) -> Optional[dict]:
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def set_user_role(user_id: str, role: str) -> Optional[dict]:
+    if role not in VALID_ROLES:
+        raise ValueError(f"无效角色：{role}")
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+    conn.commit()
+    row = cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def list_agents() -> list:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT id, nickname, email, phone, role FROM users "
+        "WHERE role IN ('agent', 'admin') ORDER BY role DESC, id ASC"
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 
 # ---------- 用户反馈 ----------

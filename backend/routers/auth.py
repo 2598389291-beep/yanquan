@@ -128,6 +128,7 @@ def _login_response(user: dict) -> dict:
             "user_id": user["id"],
             "nickname": user.get("nickname", ""),
             "avatar": user.get("avatar", ""),
+            "role": user.get("role") or "consumer",
             "expires_at": user.get("token_expires_at", ""),
         },
     }

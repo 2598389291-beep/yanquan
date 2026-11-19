@@ -31,6 +31,7 @@
 | 模板与案例 | 10 个高频纠纷即用模板、8 个脱敏维权案例 |
 | 轻回访 | 一次性询问处理结果，积累真实解决数据（可忽略） |
 | 用户系统 | 邮箱登录（自动注册）+ 微信登录，隐私协议可勾选同意 |
+| 运营协同 | 消费 / 客服 / 管理员三类角色，案件认领、管理员分派、状态流转、操作日志与用户进度查询 |
 
 ## 技术架构
 
@@ -40,8 +41,9 @@
    ▼
 后端服务（Python FastAPI · Docker · 微信云托管）
    ├── 路由层：complaint / evidence / guide / laws / auth / feedback
+   ├── 运营层：RBAC · 案件队列 · 认领/分派 · 状态机 · 操作日志
    ├── 服务层：任务式生成管线 · RAG 检索 · ASR 转写 · OCR · 行动指南
-   └── 数据层：SQLite（users / complaints / legal_knowledge / feedback / usage）
+   └── 数据层：SQLite（users / complaints / case_events / legal_knowledge / feedback / usage）
    │
    ├── 阿里云百炼（通义千问：文书起草/质检，可选增强）
    ├── DashScope（语音识别 paraformer / 图像识别 qwen-vl，可选）
@@ -54,6 +56,23 @@
 - **防编造**：缺失信息强制【请补充】占位，代码级净化 + 知识库白名单校验；
 - **双模式**：未配置 Key 时纯规则管线可完整演示；配置后 LLM 增强；
 - **降级策略**：管线每一步失败均回退规则实现，任何情况都有结果。
+
+## 运营协同能力
+
+当前已完成 P0 的后端基础，运营前端仍待开发：
+
+| 能力 | 状态 | 说明 |
+|------|------|------|
+| RBAC | 已完成 | `consumer / agent / admin` 三类角色；客服接口必须登录 |
+| 案件队列 | 已完成 | 按状态、类别、关键词筛选；客服只看待认领和自己名下案件 |
+| 认领与分派 | 已完成 | 客服认领、管理员分派；重复操作幂等 |
+| 状态流转 | 已完成 | `待认领 → 处理中 → 待用户补充 → 已解决 → 已关闭` 的显式状态机 |
+| 操作日志 | 已完成 | 与认领/分派/状态变更在同一事务内写入 `case_events` |
+| 用户进度 | 已完成 | 案件归属人可通过登录态查看处理进度，不暴露客服账号 |
+| SLA / 运营前端 | 待开发 | 不把尚未实现的能力写入简历或对外数字 |
+
+管理员初始化方式：先设置 `ADMIN_USER_ID`，该账号登录后自动获得 `admin` 角色；
+管理员再调用 `POST /api/operations/users/{user_id}/role` 将其他账号设为 `agent`。
 
 ## 快速开始
 
@@ -76,14 +95,14 @@ npm run build:weapp         # 产物在 miniapp/dist，用微信开发者工具�
 |------|------|
 | `DASHSCOPE_API_KEY` | 阿里云百炼 / DashScope Key（不填则规则模式） |
 | `WECHAT_APPID` / `WECHAT_SECRET` | 微信登录（小程序后台获取） |
-| `ADMIN_USER_ID` | 管理员账号 ID（该账号不限免费次数） |
+| `ADMIN_USER_ID` | 管理员账号 ID（自动获得 `admin` 角色且不限免费次数） |
 | `DATABASE_URL` | SQLite 连接串（默认本地文件） |
 
 ## 测试
 
 ```bash
 cd backend
-python -m pytest tests -q    # 66 个自动化测试
+python -m pytest tests -q    # 82 个自动化测试
 ```
 
 ## 部署

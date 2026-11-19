@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import init_db
-from .routers import auth, complaint, evidence, feedback, guide, laws, ocr
+from .routers import auth, complaint, evidence, feedback, guide, laws, ocr, operations
 from .database import get_legal_knowledge
 from .services.guide import get_guide_scenarios
 from .services.templates import get_common_templates
@@ -25,8 +25,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-APP_VERSION = "1.1.0"
-APP_BUILD = "20260827-v1.2"
+APP_VERSION = "1.2.0"
+APP_BUILD = "20261119-ops-rbac"
 
 
 @asynccontextmanager
@@ -63,6 +63,7 @@ app.include_router(guide.router)
 app.include_router(laws.router)
 app.include_router(evidence.router)
 app.include_router(feedback.router)
+app.include_router(operations.router)
 
 # 证据图片静态访问（/files/evidence/xxx.png）
 import os as _os
@@ -117,11 +118,14 @@ def health():
 def meta(authorization: Optional[str] = Header(None)):
     """小程序启动时拉取：运行模式 / 能力开关 / 版本号 / 管理员标记"""
     is_admin = False
+    role = "consumer"
     if authorization and authorization.startswith("Bearer "):
+        from .authz import effective_role
         from .database import get_user_by_token
         user = get_user_by_token(authorization[7:])
-        if user and settings.admin_user_id and str(user["id"]) == settings.admin_user_id:
-            is_admin = True
+        if user:
+            role = effective_role(user)
+            is_admin = role == "admin"
     return {
         "code": 0,
         "data": {
@@ -130,6 +134,7 @@ def meta(authorization: Optional[str] = Header(None)):
             "version": APP_VERSION,
             "demo_mode": settings.demo_mode,
             "is_admin": is_admin,
+            "role": role,
             "features": {
                 "voice": not settings.demo_mode,
                 "ocr": not settings.demo_mode,

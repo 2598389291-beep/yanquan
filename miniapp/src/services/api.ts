@@ -271,6 +271,7 @@ export interface LoginData {
   user_id: number
   nickname: string
   avatar: string
+  role?: 'consumer' | 'agent' | 'admin'
   expires_at: string
 }
 
@@ -302,6 +303,7 @@ export interface MetaInfo {
   version: string
   demo_mode: boolean
   is_admin?: boolean
+  role?: 'consumer' | 'agent' | 'admin'
   features: { voice: boolean; ocr: boolean; wechat_login: boolean }
   stats?: { laws: number; scenarios: number; templates: number; cases: number }
 }

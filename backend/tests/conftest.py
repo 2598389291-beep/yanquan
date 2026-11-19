@@ -23,6 +23,7 @@ def _clean_db():
     conn.execute("DELETE FROM users")
     conn.execute("DELETE FROM feedback")
     conn.execute("DELETE FROM usage_stats")
+    conn.execute("DELETE FROM case_events")
     conn.commit()
     conn.close()
     yield

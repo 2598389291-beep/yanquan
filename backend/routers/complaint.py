@@ -7,15 +7,17 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, Header, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
 from starlette.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from ..config import settings
+from ..authz import require_roles
 from ..database import (
-    FREE_GENERATION_LIMIT, STATUS_LABELS, VALID_STATUSES, delete_complaint,
-    get_complaint_by_id, get_complaint_stats, get_complaints, get_usage,
+    CASE_STATUS_LABELS, FREE_GENERATION_LIMIT, STATUS_LABELS, VALID_STATUSES,
+    delete_complaint, get_case_by_id, get_case_events, get_complaint_by_id,
+    get_complaint_stats, get_complaints, get_usage,
     get_user_by_token, increment_usage, save_complaint, save_feedback, update_complaint_status,
 )
 import httpx
@@ -599,6 +601,46 @@ async def complaint_detail(complaint_id: int):
             "order_info": json.loads(record["order_info"]) if record["order_info"] else {},
             "evidence": json.loads(record["evidence"]) if record.get("evidence") else [],
             "created_at": record["created_at"],
+        },
+    }
+
+
+@router.get("/complaint/{complaint_id}/progress")
+async def complaint_progress(
+    complaint_id: int,
+    owner: dict = Depends(require_roles("consumer", "agent", "admin")),
+):
+    """用户查看案件处理进度与客服操作轨迹（仅案件归属人）。"""
+    case = get_case_by_id(complaint_id)
+    if not case or str(case.get("user_id")) != str(owner["id"]):
+        return _error(404, "投诉记录不存在或无权限查看")
+    events = get_case_events(complaint_id)
+    public_actions = {
+        "claimed": "客服已认领",
+        "assigned": "案件已分派",
+        "status_changed": "处理进度已更新",
+    }
+    return {
+        "code": 0,
+        "data": {
+            "id": complaint_id,
+            "case_status": case["case_status"],
+            "case_status_label": CASE_STATUS_LABELS.get(
+                case["case_status"], case["case_status"]
+            ),
+            "assignee_nickname": case.get("assignee_nickname") or "",
+            "events": [
+                {
+                    "action": event["action"],
+                    "label": public_actions.get(event["action"], "案件状态已更新"),
+                    "case_status": event["to_case_status"],
+                    "case_status_label": CASE_STATUS_LABELS.get(
+                        event["to_case_status"], event["to_case_status"]
+                    ),
+                    "created_at": event["created_at"],
+                }
+                for event in events
+            ],
         },
     }
 

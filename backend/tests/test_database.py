@@ -87,3 +87,18 @@ def test_status_filter():
     items, total = db.get_complaints("u1", status="resolved")
     assert total == 1
     assert items[0]["status"] == "resolved"
+
+
+def test_rbac_and_operations_schema_exists():
+    """初始化后应具备角色、案件运营字段和操作日志表。"""
+    conn = db.get_connection()
+    user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    complaint_cols = {row[1] for row in conn.execute("PRAGMA table_info(complaints)").fetchall()}
+    event_table = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='case_events'"
+    ).fetchone()
+    conn.close()
+
+    assert "role" in user_cols
+    assert {"case_status", "assignee_id", "claimed_at"}.issubset(complaint_cols)
+    assert event_table is not None
