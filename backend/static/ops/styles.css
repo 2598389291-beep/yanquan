@@ -334,7 +334,7 @@ p {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -384,7 +384,7 @@ p {
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 180px auto;
+  grid-template-columns: minmax(220px, 1fr) 160px 160px auto;
   gap: 10px;
   padding: 0 22px 20px;
   border-bottom: 1px solid var(--line);
@@ -508,6 +508,26 @@ tbody tr:hover {
 .pill-on-track {
   color: #1d6949;
   background: #e8f6ef;
+}
+
+.pill-urgent {
+  color: #8b3030;
+  background: #fbe9e9;
+}
+
+.pill-high {
+  color: #8a5711;
+  background: #fff2d9;
+}
+
+.pill-normal {
+  color: #175d7d;
+  background: #e8f5fa;
+}
+
+.pill-low {
+  color: #5d6872;
+  background: #edf1f3;
 }
 
 .empty-state {

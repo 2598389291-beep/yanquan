@@ -71,6 +71,7 @@
 | 用户进度 | 已完成 | 案件归属人可通过登录态查看处理进度，不暴露客服账号 |
 | 运营控制台 | 已完成最小闭环 | 浏览器访问 `/ops/`，支持登录、筛选、详情、认领、分派和状态流转 |
 | SLA 到期提示 | 已完成 | `CASE_SLA_HOURS` 可配置；列表、详情、用户进度和运营摘要显示真实到期状态 |
+| 智能分诊 | 已完成第一版 | 自动输出类别、优先级、推荐团队、置信度、理由和信号；规则兜底，模型可重算 |
 
 管理员初始化方式：先设置 `ADMIN_USER_ID`，该账号登录后自动获得 `admin` 角色；
 管理员再调用 `POST /api/operations/users/{user_id}/role` 将其他账号设为 `agent`。
@@ -103,7 +104,7 @@ npm run build:weapp         # 产物在 miniapp/dist，用微信开发者工具�
 
 ```bash
 cd backend
-python -m pytest tests -q    # 87 个自动化测试
+python -m pytest tests -q    # 91 个自动化测试
 ```
 
 启动服务后访问 `http://127.0.0.1:8000/ops/` 可进入客服运营控制台。

@@ -21,7 +21,9 @@ from ..database import (
     list_cases,
     set_user_role,
     transition_case,
+    update_case_triage,
 )
+from ..services.triage import triage_case
 
 router = APIRouter(prefix="/api/operations", tags=["客服运营"])
 
@@ -71,6 +73,16 @@ def _serialize_case(case: dict, include_letter: bool = False) -> dict:
         "action_path": _json_value(case.get("action_path"), []),
         "order_info": _json_value(case.get("order_info"), {}),
         "evidence": _json_value(case.get("evidence"), []),
+        "triage": {
+            "category": case.get("triage_category") or "",
+            "priority": case.get("triage_priority") or "",
+            "team": case.get("triage_team") or "",
+            "confidence": case.get("triage_confidence"),
+            "reason": case.get("triage_reason") or "",
+            "signals": _json_value(case.get("triage_signals"), []),
+            "source": case.get("triage_source") or "",
+            "triaged_at": case.get("triage_at") or "",
+        },
         "events": case.get("events") or [],
     }
     if include_letter:
@@ -97,6 +109,7 @@ async def operations_cases(
     case_status: str = "all",
     category: str = "",
     assignee_id: Optional[str] = None,
+    priority: str = "all",
     q: str = "",
     actor: dict = Depends(require_roles("agent", "admin")),
 ):
@@ -110,6 +123,7 @@ async def operations_cases(
         case_status=case_status,
         category=category or None,
         assignee_id=assignee_id if actor["role"] == "admin" else None,
+        priority=priority,
         query=q or None,
     )
     return {
@@ -199,6 +213,28 @@ async def update_operations_case_status(
         case = transition_case(complaint_id, str(actor["id"]), req.case_status)
     except ValueError as exc:
         return _error(400, str(exc))
+    return {"code": 0, "data": _serialize_case(case, include_letter=True)}
+
+
+@router.post("/cases/{complaint_id}/triage")
+async def triage_operations_case(
+    complaint_id: int,
+    actor: dict = Depends(require_roles("agent", "admin")),
+):
+    existing = get_case_by_id(complaint_id)
+    if not existing:
+        return _error(404, "案件不存在")
+    if not _can_view_case(existing, actor):
+        return _error(403, "无权操作其他客服的案件")
+    evidence = _json_value(existing.get("evidence"), [])
+    order_info = _json_value(existing.get("order_info"), {})
+    triage = triage_case(
+        existing.get("raw_text", ""),
+        existing_category=existing.get("category", ""),
+        order_info=order_info,
+        evidence=evidence,
+    )
+    case = update_case_triage(complaint_id, str(actor["id"]), triage)
     return {"code": 0, "data": _serialize_case(case, include_letter=True)}
 
 

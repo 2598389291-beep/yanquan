@@ -72,6 +72,14 @@ def init_db():
             assignee_id TEXT DEFAULT '',
             claimed_at TIMESTAMP,
             sla_due_at TIMESTAMP,
+            triage_category TEXT DEFAULT '',
+            triage_priority TEXT DEFAULT 'normal',
+            triage_team TEXT DEFAULT '',
+            triage_confidence REAL,
+            triage_reason TEXT DEFAULT '',
+            triage_signals TEXT DEFAULT '[]',
+            triage_source TEXT DEFAULT '',
+            triage_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT (datetime('now','localtime'))
         );
 
@@ -132,6 +140,18 @@ def _migrate(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE complaints ADD COLUMN claimed_at TIMESTAMP")
     if "sla_due_at" not in cols:
         conn.execute("ALTER TABLE complaints ADD COLUMN sla_due_at TIMESTAMP")
+    for column, definition in (
+        ("triage_category", "TEXT DEFAULT ''"),
+        ("triage_priority", "TEXT DEFAULT 'normal'"),
+        ("triage_team", "TEXT DEFAULT ''"),
+        ("triage_confidence", "REAL"),
+        ("triage_reason", "TEXT DEFAULT ''"),
+        ("triage_signals", "TEXT DEFAULT '[]'"),
+        ("triage_source", "TEXT DEFAULT ''"),
+        ("triage_at", "TIMESTAMP"),
+    ):
+        if column not in cols:
+            conn.execute(f"ALTER TABLE complaints ADD COLUMN {column} {definition}")
 
     # users 表升级：新增 email / password_hash，phone 放开唯一约束（微信/邮箱用户可无手机号）
     user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
@@ -287,19 +307,31 @@ def save_complaint(
     category: str,
     order_info: Optional[dict] = None,
     evidence: Optional[list] = None,
+    triage: Optional[dict] = None,
 ) -> dict:
     conn = get_connection()
     cursor = conn.cursor()
+    triage = triage or {}
     cursor.execute(
         """INSERT INTO complaints
            (user_id, raw_text, complaint_letter, legal_basis, action_path, category,
-            order_info, evidence, sla_due_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime', ?))""",
+            order_info, evidence, sla_due_at, triage_category, triage_priority,
+            triage_team, triage_confidence, triage_reason, triage_signals,
+            triage_source, triage_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime', ?),
+                   ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))""",
         (user_id, raw_text, complaint_letter, json.dumps(legal_basis, ensure_ascii=False),
          json.dumps(action_path, ensure_ascii=False), category,
          json.dumps(order_info or {}, ensure_ascii=False),
          json.dumps(evidence or [], ensure_ascii=False),
-         f"+{max(1, settings.case_sla_hours)} hours"),
+         f"+{max(1, settings.case_sla_hours)} hours",
+         triage.get("category", ""),
+         triage.get("priority", "normal"),
+         triage.get("team", ""),
+         triage.get("confidence"),
+         triage.get("reason", ""),
+         json.dumps(triage.get("signals", []), ensure_ascii=False),
+         triage.get("source", "")),
     )
     conn.commit()
     complaint_id = cursor.lastrowid
@@ -494,6 +526,7 @@ def list_cases(
     category: Optional[str] = None,
     assignee_id: Optional[str] = None,
     query: Optional[str] = None,
+    priority: Optional[str] = None,
 ) -> tuple[list, int]:
     """运营案件列表。客服只看待认领和自己名下案件，管理员看全部。"""
     conn = get_connection()
@@ -515,10 +548,16 @@ def list_cases(
     if query:
         where.append("c.raw_text LIKE ?")
         params.append(f"%{query.strip()}%")
+    if priority and priority != "all":
+        where.append("c.triage_priority = ?")
+        params.append(priority)
     where_sql = " AND ".join(where)
     cursor.execute(
         "SELECT c.id, c.category, c.raw_text, c.status, c.case_status, "
         "c.assignee_id, c.created_at, c.claimed_at, c.sla_due_at, "
+        "c.triage_category, c.triage_priority, c.triage_team, "
+        "c.triage_confidence, c.triage_reason, c.triage_signals, "
+        "c.triage_source, c.triage_at, "
         "u.nickname AS assignee_nickname, u.email AS assignee_email, "
         "u.phone AS assignee_phone "
         "FROM complaints c "
@@ -581,6 +620,8 @@ def get_operations_summary(actor_id: str, actor_role: str) -> dict:
         "SUM(CASE WHEN case_status = 'pending_assignment' THEN 1 ELSE 0 END) AS pending_assignment, "
         "SUM(CASE WHEN case_status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress, "
         "SUM(CASE WHEN case_status = 'waiting_user' THEN 1 ELSE 0 END) AS waiting_user, "
+        "SUM(CASE WHEN triage_priority IN ('urgent','high') "
+        "AND case_status NOT IN ('resolved','closed') THEN 1 ELSE 0 END) AS high_priority, "
         "SUM(CASE WHEN case_status NOT IN ('resolved','closed') "
         "AND sla_due_at IS NOT NULL AND datetime(sla_due_at) < datetime('now','localtime') "
         "THEN 1 ELSE 0 END) AS overdue "
@@ -593,6 +634,7 @@ def get_operations_summary(actor_id: str, actor_role: str) -> dict:
         "pending_assignment": row["pending_assignment"] or 0,
         "in_progress": row["in_progress"] or 0,
         "waiting_user": row["waiting_user"] or 0,
+        "high_priority": row["high_priority"] or 0,
         "overdue": row["overdue"] or 0,
     }
 
@@ -724,6 +766,53 @@ def transition_case(complaint_id: int, actor_id: str, new_status: str) -> Option
         from_case_status=old_status,
         to_case_status=new_status,
         assignee_id=row["assignee_id"] or "",
+    )
+    conn.commit()
+    conn.close()
+    return get_case_by_id(complaint_id)
+
+
+def update_case_triage(complaint_id: int, actor_id: str, triage: dict) -> Optional[dict]:
+    """保存重新分诊结果并记录操作日志。"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    row = _get_case_row(cursor, complaint_id)
+    if not row:
+        conn.rollback()
+        conn.close()
+        return None
+    cursor.execute(
+        "UPDATE complaints SET triage_category = ?, triage_priority = ?, "
+        "triage_team = ?, triage_confidence = ?, triage_reason = ?, "
+        "triage_signals = ?, triage_source = ?, triage_at = datetime('now','localtime') "
+        "WHERE id = ?",
+        (
+            triage.get("category", ""),
+            triage.get("priority", "normal"),
+            triage.get("team", ""),
+            triage.get("confidence"),
+            triage.get("reason", ""),
+            json.dumps(triage.get("signals", []), ensure_ascii=False),
+            triage.get("source", ""),
+            complaint_id,
+        ),
+    )
+    _append_case_event(
+        cursor,
+        complaint_id,
+        actor_id,
+        "triaged",
+        from_case_status=row["case_status"],
+        to_case_status=row["case_status"],
+        assignee_id=row["assignee_id"] or "",
+        detail={
+            "category": triage.get("category", ""),
+            "priority": triage.get("priority", "normal"),
+            "team": triage.get("team", ""),
+            "confidence": triage.get("confidence"),
+            "source": triage.get("source", ""),
+        },
     )
     conn.commit()
     conn.close()

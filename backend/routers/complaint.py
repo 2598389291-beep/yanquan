@@ -25,6 +25,7 @@ import httpx
 from ..services import task_manager
 from ..services.asr import transcribe_audio
 from ..services.complaint_generator import generate_complaint, generate_complaint_progressive
+from ..services.triage import triage_case
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,15 @@ def _parse_evidence(raw: Optional[str]) -> list:
         return []
 
 
+def _build_case_triage(raw_text: str, result: dict, order_info: Optional[dict], evidence: Optional[list]) -> dict:
+    return triage_case(
+        raw_text,
+        existing_category=result.get("category", ""),
+        order_info=order_info,
+        evidence=evidence,
+    )
+
+
 # ---------- 任务式生成（分阶段：先骨架后补全） ----------
 
 def _download_audio(audio_url: str, audio_name: str) -> str:
@@ -177,6 +187,7 @@ def _run_text_task(task: dict, text: str, order_info: Optional[dict], evidence: 
 
     try:
         result = generate_complaint_progressive(text, order_info, evidence, progress)
+        triage = _build_case_triage(text, result, order_info, evidence)
         rec = save_complaint(
             user_id=uid, raw_text=text,
             complaint_letter=result["complaint_letter"],
@@ -184,6 +195,7 @@ def _run_text_task(task: dict, text: str, order_info: Optional[dict], evidence: 
             action_path=result.get("action_path", []),
             category=result.get("category", "其他"),
             order_info=order_info, evidence=evidence or [],
+            triage=triage,
         )
         increment_usage(uid)
         task_manager.update(
@@ -251,6 +263,7 @@ async def complaint_voice_json(
             if not text:
                 raise ValueError("未能识别到有效语音内容，请重试")
             res = generate_complaint(text, req.order_info)
+            triage = _build_case_triage(text, res, req.order_info, req.evidence or [])
             rec = save_complaint(
                 user_id=uid, raw_text=text,
                 complaint_letter=res["complaint_letter"],
@@ -259,6 +272,7 @@ async def complaint_voice_json(
                 category=res["category"],
                 order_info=req.order_info,
                 evidence=req.evidence or [],
+                triage=triage,
             )
             increment_usage(user_id=uid)
             return text, res, rec
@@ -329,6 +343,7 @@ async def complaint_voice(
                 if not text:
                     raise ValueError("未能识别到有效语音内容，请重试")
                 res = generate_complaint(text, parsed_order_info)
+                triage = _build_case_triage(text, res, parsed_order_info, parsed_evidence)
                 rec = save_complaint(
                     user_id=uid,
                     raw_text=text,
@@ -338,6 +353,7 @@ async def complaint_voice(
                     category=res["category"],
                     order_info=parsed_order_info,
                     evidence=parsed_evidence,
+                    triage=triage,
                 )
                 increment_usage(user_id=uid)
                 return text, res, rec
@@ -376,6 +392,7 @@ async def complaint_text(
     try:
         def _process() -> tuple:
             res = generate_complaint(req.text, req.order_info)
+            triage = _build_case_triage(req.text, res, req.order_info, req.evidence or [])
             rec = save_complaint(
                 user_id=uid,
                 raw_text=req.text,
@@ -385,6 +402,7 @@ async def complaint_text(
                 category=res["category"],
                 order_info=req.order_info,
                 evidence=req.evidence or [],
+                triage=triage,
             )
             increment_usage(user_id=uid)
             return res, rec

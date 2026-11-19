@@ -83,6 +83,10 @@
             <span>处理中</span>
             <strong id="metric-progress">—</strong>
           </article>
+          <article class="metric-item">
+            <span>高优先级</span>
+            <strong id="metric-high">—</strong>
+          </article>
           <article class="metric-item metric-item-alert">
             <span>已超时</span>
             <strong id="metric-overdue">—</strong>
@@ -112,6 +116,16 @@
                 <option value="waiting_user">待用户补充</option>
                 <option value="resolved">已解决</option>
                 <option value="closed">已关闭</option>
+              </select>
+            </label>
+            <label>
+              <span class="sr-only">分诊优先级</span>
+              <select id="priority-filter">
+                <option value="all">全部优先级</option>
+                <option value="urgent">紧急</option>
+                <option value="high">高</option>
+                <option value="normal">普通</option>
+                <option value="low">低</option>
               </select>
             </label>
             <button class="button button-primary" type="submit">筛选</button>

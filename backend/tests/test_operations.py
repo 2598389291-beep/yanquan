@@ -52,6 +52,32 @@ def test_case_has_sla_due_at_and_summary_counts(client):
     assert summary.json()["data"]["overdue"] == 1
 
 
+def test_operations_can_retriage_case_and_log_event(client):
+    consumer = _create_user("13800000025")
+    agent = _create_user("13800000026", "agent")
+    case = _create_case(str(consumer["id"]))
+
+    resp = client.post(
+        f"/api/operations/cases/{case['id']}/triage",
+        headers=_headers(agent),
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["triage"]["category"] == "网购纠纷"
+    assert data["triage"]["team"] == "电商与平台组"
+    assert data["triage"]["priority"] == "high"
+    assert data["triage"]["confidence"] > 0
+    assert data["events"][-1]["action"] == "triaged"
+
+    summary = client.get("/api/operations/summary", headers=_headers(agent))
+    assert summary.json()["data"]["high_priority"] == 1
+    high_cases = client.get(
+        "/api/operations/cases?priority=high",
+        headers=_headers(agent),
+    )
+    assert high_cases.json()["data"]["total"] == 1
+
+
 def test_login_exposes_consumer_role(client):
     resp = client.post(
         "/api/auth/email/login",

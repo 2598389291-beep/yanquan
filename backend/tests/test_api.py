@@ -119,6 +119,11 @@ def test_text_generate_full_flow(client):
     assert data["status"] == "generated"
 
     cid = data["id"]
+    from backend.database import get_complaint_by_id
+    stored = get_complaint_by_id(cid)
+    assert stored["triage_category"]
+    assert stored["triage_priority"] in ("urgent", "high", "normal", "low")
+    assert stored["triage_team"]
 
     # 列表
     resp = client.get("/api/complaints")

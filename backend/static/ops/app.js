@@ -35,6 +35,13 @@ const slaMap = {
   unknown: { label: "未设置", className: "pill-closed" },
 };
 
+const priorityMap = {
+  urgent: { label: "紧急", className: "pill-urgent" },
+  high: { label: "高", className: "pill-high" },
+  normal: { label: "普通", className: "pill-normal" },
+  low: { label: "低", className: "pill-low" },
+};
+
 const $ = (selector) => document.querySelector(selector);
 
 function escapeHtml(value) {
@@ -58,6 +65,11 @@ function statusBadge(status) {
 
 function slaBadge(status) {
   const meta = slaMap[status] || slaMap.unknown;
+  return `<span class="pill ${meta.className}">${escapeHtml(meta.label)}</span>`;
+}
+
+function priorityBadge(priority) {
+  const meta = priorityMap[priority] || { label: "未分诊", className: "pill-low" };
   return `<span class="pill ${meta.className}">${escapeHtml(meta.label)}</span>`;
 }
 
@@ -176,6 +188,7 @@ async function loadCases() {
     page: String(state.page),
     page_size: String(state.pageSize),
     case_status: $("#status-filter").value,
+    priority: $("#priority-filter").value,
     q: $("#search").value.trim(),
   });
   try {
@@ -200,6 +213,7 @@ function renderSummary() {
   $("#metric-total").textContent = String(summary.total ?? 0);
   $("#metric-pending").textContent = String(summary.pending_assignment ?? 0);
   $("#metric-progress").textContent = String(summary.in_progress ?? 0);
+  $("#metric-high").textContent = String(summary.high_priority ?? 0);
   $("#metric-overdue").textContent = String(summary.overdue ?? 0);
 }
 
@@ -217,7 +231,13 @@ function renderCases() {
             </div>
           </td>
           <td class="muted">${escapeHtml(item.category || "未分类")}</td>
-          <td><div class="case-cell">${statusBadge(item.case_status)}${slaBadge(item.sla_state)}</div></td>
+          <td>
+            <div class="case-cell">
+              ${statusBadge(item.case_status)}
+              ${priorityBadge(item.triage_priority)}
+              ${slaBadge(item.sla_state)}
+            </div>
+          </td>
           <td class="muted">${escapeHtml(item.assignee_name || "未分配")}</td>
           <td class="muted">${escapeHtml(formatDate(item.created_at))}</td>
         </tr>`
@@ -269,6 +289,8 @@ function renderDrawer() {
   const actionPath = Array.isArray(item.action_path) ? item.action_path : [];
   const evidence = Array.isArray(item.evidence) ? item.evidence : [];
   const events = Array.isArray(item.events) ? item.events : [];
+  const triage = item.triage || {};
+  const triageSignals = Array.isArray(triage.signals) ? triage.signals : [];
   const transitionButtons = (transitions[item.case_status] || [])
     .filter((next) => !(next === "in_progress" && item.case_status === "pending_assignment"))
     .map(
@@ -342,6 +364,35 @@ function renderDrawer() {
     </section>
 
     <section class="detail-section">
+      <h3>智能分诊</h3>
+      <div class="detail-grid">
+        <div class="detail-field">
+          <span>分诊类别</span>
+          <strong>${escapeHtml(triage.category || "未分诊")}</strong>
+        </div>
+        <div class="detail-field">
+          <span>优先级</span>
+          <strong>${priorityBadge(triage.priority)}</strong>
+        </div>
+        <div class="detail-field">
+          <span>推荐团队</span>
+          <strong>${escapeHtml(triage.team || "综合处理组")}</strong>
+        </div>
+        <div class="detail-field">
+          <span>置信度</span>
+          <strong>${triage.confidence == null ? "—" : `${Math.round(Number(triage.confidence) * 100)}%`}</strong>
+        </div>
+      </div>
+      <p>${escapeHtml(triage.reason || "尚未生成分诊理由")}</p>
+      <div class="tag-list">
+        ${triageSignals.length ? triageSignals.map((signal) => `<span class="tag">${escapeHtml(signal)}</span>`).join("") : '<span class="muted">暂无分诊信号</span>'}
+      </div>
+      <div class="action-row triage-actions">
+        <button id="retriage-case" class="button button-secondary" type="button">重新分诊</button>
+      </div>
+    </section>
+
+    <section class="detail-section">
       <h3>法条依据</h3>
       <div class="tag-list">
         ${legalBasis.length ? legalBasis.map((law) => `<span class="tag">${escapeHtml(law)}</span>`).join("") : '<span class="muted">暂无</span>'}
@@ -382,6 +433,7 @@ function renderDrawer() {
   `;
 
   $("#claim-case")?.addEventListener("click", claimCase);
+  $("#retriage-case")?.addEventListener("click", retriageCase);
   $("#assign-form")?.addEventListener("submit", assignCase);
   $("#case-detail")
     .querySelectorAll("[data-status]")
@@ -391,6 +443,9 @@ function renderDrawer() {
 function eventLabel(event) {
   if (event.action === "claimed") return "客服认领案件";
   if (event.action === "assigned") return "管理员分派案件";
+  if (event.action === "triaged") {
+    return `智能分诊：${event.detail?.category || ""} · ${priorityMap[event.detail?.priority]?.label || event.detail?.priority || ""}`;
+  }
   if (event.action === "status_changed") {
     const from = statusMap[event.from_case_status]?.label || event.from_case_status;
     const to = statusMap[event.to_case_status]?.label || event.to_case_status;
@@ -454,6 +509,15 @@ function changeStatus(nextStatus) {
     `/api/operations/cases/${state.selectedCase.id}/status`,
     { case_status: nextStatus },
     "案件状态已更新"
+  );
+}
+
+function retriageCase() {
+  if (!state.selectedCase) return;
+  mutateCase(
+    `/api/operations/cases/${state.selectedCase.id}/triage`,
+    null,
+    "智能分诊已更新"
   );
 }
 
