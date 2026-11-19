@@ -8,6 +8,7 @@ const state = {
   pageSize: 20,
   selectedCase: null,
   agents: [],
+  summary: null,
   loading: false,
 };
 
@@ -25,6 +26,13 @@ const transitions = {
   waiting_user: ["in_progress", "resolved", "closed"],
   resolved: ["in_progress", "closed"],
   closed: ["in_progress"],
+};
+
+const slaMap = {
+  overdue: { label: "已超时", className: "pill-overdue" },
+  on_track: { label: "未超时", className: "pill-on-track" },
+  completed: { label: "已结束", className: "pill-closed" },
+  unknown: { label: "未设置", className: "pill-closed" },
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -45,6 +53,11 @@ function formatDate(value) {
 
 function statusBadge(status) {
   const meta = statusMap[status] || { label: status || "未知", className: "pill-closed" };
+  return `<span class="pill ${meta.className}">${escapeHtml(meta.label)}</span>`;
+}
+
+function slaBadge(status) {
+  const meta = slaMap[status] || slaMap.unknown;
   return `<span class="pill ${meta.className}">${escapeHtml(meta.label)}</span>`;
 }
 
@@ -166,15 +179,28 @@ async function loadCases() {
     q: $("#search").value.trim(),
   });
   try {
-    const data = await api(`/api/operations/cases?${params}`);
+    const [data, summary] = await Promise.all([
+      api(`/api/operations/cases?${params}`),
+      api("/api/operations/summary"),
+    ]);
     state.cases = data.items;
     state.total = data.total;
+    state.summary = summary;
+    renderSummary();
     renderCases();
   } catch (err) {
     showToast(err.message);
   } finally {
     setLoading(false);
   }
+}
+
+function renderSummary() {
+  const summary = state.summary || {};
+  $("#metric-total").textContent = String(summary.total ?? 0);
+  $("#metric-pending").textContent = String(summary.pending_assignment ?? 0);
+  $("#metric-progress").textContent = String(summary.in_progress ?? 0);
+  $("#metric-overdue").textContent = String(summary.overdue ?? 0);
 }
 
 function renderCases() {
@@ -191,7 +217,7 @@ function renderCases() {
             </div>
           </td>
           <td class="muted">${escapeHtml(item.category || "未分类")}</td>
-          <td>${statusBadge(item.case_status)}</td>
+          <td><div class="case-cell">${statusBadge(item.case_status)}${slaBadge(item.sla_state)}</div></td>
           <td class="muted">${escapeHtml(item.assignee_name || "未分配")}</td>
           <td class="muted">${escapeHtml(formatDate(item.created_at))}</td>
         </tr>`
@@ -289,6 +315,14 @@ function renderDrawer() {
         <div class="detail-field">
           <span>创建时间</span>
           <strong>${escapeHtml(formatDate(item.created_at))}</strong>
+        </div>
+        <div class="detail-field">
+          <span>SLA 到期</span>
+          <strong>${escapeHtml(formatDate(item.sla_due_at))}</strong>
+        </div>
+        <div class="detail-field">
+          <span>SLA 状态</span>
+          <strong>${slaBadge(item.sla_state)}</strong>
         </div>
       </div>
     </section>

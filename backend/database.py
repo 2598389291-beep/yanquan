@@ -71,6 +71,7 @@ def init_db():
             case_status TEXT NOT NULL DEFAULT 'pending_assignment',
             assignee_id TEXT DEFAULT '',
             claimed_at TIMESTAMP,
+            sla_due_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT (datetime('now','localtime'))
         );
 
@@ -129,6 +130,8 @@ def _migrate(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE complaints ADD COLUMN assignee_id TEXT DEFAULT ''")
     if "claimed_at" not in cols:
         conn.execute("ALTER TABLE complaints ADD COLUMN claimed_at TIMESTAMP")
+    if "sla_due_at" not in cols:
+        conn.execute("ALTER TABLE complaints ADD COLUMN sla_due_at TIMESTAMP")
 
     # users 表升级：新增 email / password_hash，phone 放开唯一约束（微信/邮箱用户可无手机号）
     user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
@@ -178,6 +181,11 @@ def _migrate(conn: sqlite3.Connection):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_case_events_complaint "
         "ON case_events(complaint_id, created_at ASC, id ASC)"
+    )
+    conn.execute(
+        "UPDATE complaints SET sla_due_at = datetime(created_at, ?) "
+        "WHERE sla_due_at IS NULL",
+        (f"+{max(1, settings.case_sla_hours)} hours",),
     )
 
 
@@ -284,12 +292,14 @@ def save_complaint(
     cursor = conn.cursor()
     cursor.execute(
         """INSERT INTO complaints
-           (user_id, raw_text, complaint_letter, legal_basis, action_path, category, order_info, evidence)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+           (user_id, raw_text, complaint_letter, legal_basis, action_path, category,
+            order_info, evidence, sla_due_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime', ?))""",
         (user_id, raw_text, complaint_letter, json.dumps(legal_basis, ensure_ascii=False),
          json.dumps(action_path, ensure_ascii=False), category,
          json.dumps(order_info or {}, ensure_ascii=False),
-         json.dumps(evidence or [], ensure_ascii=False)),
+         json.dumps(evidence or [], ensure_ascii=False),
+         f"+{max(1, settings.case_sla_hours)} hours"),
     )
     conn.commit()
     complaint_id = cursor.lastrowid
@@ -508,7 +518,7 @@ def list_cases(
     where_sql = " AND ".join(where)
     cursor.execute(
         "SELECT c.id, c.category, c.raw_text, c.status, c.case_status, "
-        "c.assignee_id, c.created_at, c.claimed_at, "
+        "c.assignee_id, c.created_at, c.claimed_at, c.sla_due_at, "
         "u.nickname AS assignee_nickname, u.email AS assignee_email, "
         "u.phone AS assignee_phone "
         "FROM complaints c "
@@ -528,6 +538,7 @@ def list_cases(
             item.get("case_status", ""), item.get("case_status", "")
         )
         item["assignee_name"] = _case_assignee_name(item)
+        item["sla_state"] = get_case_sla_state(item)
         items.append(item)
     return items, total
 
@@ -542,6 +553,48 @@ def _case_assignee_name(case: dict) -> str:
         or case.get("assignee_phone")
         or f"账号 {assignee_id}"
     )
+
+
+def get_case_sla_state(case: dict) -> str:
+    if case.get("case_status") in ("resolved", "closed"):
+        return "completed"
+    raw_due = case.get("sla_due_at")
+    if not raw_due:
+        return "unknown"
+    try:
+        due = datetime.fromisoformat(str(raw_due))
+    except ValueError:
+        return "unknown"
+    return "overdue" if due < datetime.now() else "on_track"
+
+
+def get_operations_summary(actor_id: str, actor_role: str) -> dict:
+    conn = get_connection()
+    where = ["1 = 1"]
+    params: list = []
+    if actor_role != "admin":
+        where.append("(assignee_id = ? OR assignee_id IS NULL OR assignee_id = '')")
+        params.append(actor_id)
+    where_sql = " AND ".join(where)
+    row = conn.execute(
+        "SELECT COUNT(*) AS total, "
+        "SUM(CASE WHEN case_status = 'pending_assignment' THEN 1 ELSE 0 END) AS pending_assignment, "
+        "SUM(CASE WHEN case_status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress, "
+        "SUM(CASE WHEN case_status = 'waiting_user' THEN 1 ELSE 0 END) AS waiting_user, "
+        "SUM(CASE WHEN case_status NOT IN ('resolved','closed') "
+        "AND sla_due_at IS NOT NULL AND datetime(sla_due_at) < datetime('now','localtime') "
+        "THEN 1 ELSE 0 END) AS overdue "
+        f"FROM complaints WHERE {where_sql}",
+        params,
+    ).fetchone()
+    conn.close()
+    return {
+        "total": row["total"] or 0,
+        "pending_assignment": row["pending_assignment"] or 0,
+        "in_progress": row["in_progress"] or 0,
+        "waiting_user": row["waiting_user"] or 0,
+        "overdue": row["overdue"] or 0,
+    }
 
 
 def claim_case(complaint_id: int, actor_id: str) -> Optional[dict]:

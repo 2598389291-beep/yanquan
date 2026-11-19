@@ -16,8 +16,8 @@ from ..config import settings
 from ..authz import require_roles
 from ..database import (
     CASE_STATUS_LABELS, FREE_GENERATION_LIMIT, STATUS_LABELS, VALID_STATUSES,
-    delete_complaint, get_case_by_id, get_case_events, get_complaint_by_id,
-    get_complaint_stats, get_complaints, get_usage,
+    delete_complaint, get_case_by_id, get_case_events, get_case_sla_state,
+    get_complaint_by_id, get_complaint_stats, get_complaints, get_usage,
     get_user_by_token, increment_usage, save_complaint, save_feedback, update_complaint_status,
 )
 import httpx
@@ -634,6 +634,8 @@ async def complaint_progress(
                 case["case_status"], case["case_status"]
             ),
             "assignee_name": assignee_name,
+            "sla_due_at": case.get("sla_due_at") or "",
+            "sla_state": get_case_sla_state(case),
             "events": [
                 {
                     "action": event["action"],

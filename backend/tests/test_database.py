@@ -100,5 +100,5 @@ def test_rbac_and_operations_schema_exists():
     conn.close()
 
     assert "role" in user_cols
-    assert {"case_status", "assignee_id", "claimed_at"}.issubset(complaint_cols)
+    assert {"case_status", "assignee_id", "claimed_at", "sla_due_at"}.issubset(complaint_cols)
     assert event_table is not None

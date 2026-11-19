@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     # ========== 运营 ==========
     # 开发者/管理员账号 ID（登录后的 user id）：此账号免费次数不限（其余用户不受影响）
     admin_user_id: str = ""
+    # 客服首次处理时限；当前用于超时提示，不代表已经实现自动升级
+    case_sla_hours: int = 24
 
     # ========== 服务监听 ==========
     host: str = "0.0.0.0"

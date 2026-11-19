@@ -25,6 +25,33 @@ def _create_case(user_id: str) -> dict:
     )
 
 
+def test_case_has_sla_due_at_and_summary_counts(client):
+    consumer = _create_user("13800000023")
+    admin = _create_user("13800000024", "admin")
+    case = _create_case(str(consumer["id"]))
+    assert case["sla_due_at"]
+
+    summary = client.get("/api/operations/summary", headers=_headers(admin))
+    assert summary.status_code == 200
+    data = summary.json()["data"]
+    assert data["total"] == 1
+    assert data["pending_assignment"] == 1
+    assert data["overdue"] == 0
+
+    conn = db.get_connection()
+    conn.execute(
+        "UPDATE complaints SET sla_due_at = datetime('now','localtime','-1 hour') WHERE id = ?",
+        (case["id"],),
+    )
+    conn.commit()
+    conn.close()
+
+    detail = client.get(f"/api/operations/cases/{case['id']}", headers=_headers(admin))
+    assert detail.json()["data"]["sla_state"] == "overdue"
+    summary = client.get("/api/operations/summary", headers=_headers(admin))
+    assert summary.json()["data"]["overdue"] == 1
+
+
 def test_login_exposes_consumer_role(client):
     resp = client.post(
         "/api/auth/email/login",
@@ -199,6 +226,7 @@ def test_user_progress_only_visible_to_owner(client):
     assert resp.status_code == 200
     assert resp.json()["data"]["case_status"] == "in_progress"
     assert resp.json()["data"]["assignee_name"] == "客服人员"
+    assert resp.json()["data"]["sla_due_at"]
     assert resp.json()["data"]["events"][0]["label"] == "客服已认领"
 
     denied = client.get(

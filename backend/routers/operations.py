@@ -14,6 +14,8 @@ from ..database import (
     assign_case,
     claim_case,
     get_case_by_id,
+    get_case_sla_state,
+    get_operations_summary,
     get_user_by_id,
     list_agents,
     list_cases,
@@ -62,6 +64,8 @@ def _serialize_case(case: dict, include_letter: bool = False) -> dict:
         "assignee_nickname": case.get("assignee_nickname") or "",
         "assignee_name": _assignee_name(case),
         "claimed_at": case.get("claimed_at") or "",
+        "sla_due_at": case.get("sla_due_at") or "",
+        "sla_state": get_case_sla_state(case),
         "created_at": case["created_at"],
         "legal_basis": _json_value(case.get("legal_basis"), []),
         "action_path": _json_value(case.get("action_path"), []),
@@ -116,6 +120,17 @@ async def operations_cases(
             "page": page,
             "page_size": page_size,
         },
+    }
+
+
+@router.get("/summary")
+async def operations_summary(
+    actor: dict = Depends(require_roles("agent", "admin")),
+):
+    """运营队列真实计数，不包含未实现的结案率或采纳率。"""
+    return {
+        "code": 0,
+        "data": get_operations_summary(str(actor["id"]), actor["role"]),
     }
 
 
