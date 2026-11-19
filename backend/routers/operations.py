@@ -60,6 +60,7 @@ def _serialize_case(case: dict, include_letter: bool = False) -> dict:
         ),
         "assignee_id": case.get("assignee_id") or "",
         "assignee_nickname": case.get("assignee_nickname") or "",
+        "assignee_name": _assignee_name(case),
         "claimed_at": case.get("claimed_at") or "",
         "created_at": case["created_at"],
         "legal_basis": _json_value(case.get("legal_basis"), []),
@@ -71,6 +72,18 @@ def _serialize_case(case: dict, include_letter: bool = False) -> dict:
     if include_letter:
         data["complaint_letter"] = case.get("complaint_letter", "")
     return data
+
+
+def _assignee_name(case: dict) -> str:
+    assignee_id = case.get("assignee_id") or ""
+    if not assignee_id:
+        return "未分配"
+    return (
+        case.get("assignee_nickname")
+        or case.get("assignee_email")
+        or case.get("assignee_phone")
+        or f"账号 {assignee_id}"
+    )
 
 
 @router.get("/cases")

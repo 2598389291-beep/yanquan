@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>言权 · 售后协同台</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="login-view" class="login-view">
+      <section class="login-panel" aria-labelledby="login-title">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">言</span>
+          <div>
+            <strong>言权</strong>
+            <span>售后协同台</span>
+          </div>
+        </div>
+        <div class="login-copy">
+          <p class="eyebrow">内部工作台</p>
+          <h1 id="login-title">登录处理账号</h1>
+          <p>仅限已授权的客服与运营管理员使用。</p>
+        </div>
+        <form id="login-form" class="login-form">
+          <label>
+            <span>邮箱</span>
+            <input id="email" name="email" type="email" autocomplete="username" required />
+          </label>
+          <label>
+            <span>密码</span>
+            <input id="password" name="password" type="password" autocomplete="current-password" required minlength="6" />
+          </label>
+          <button id="login-submit" class="button button-primary" type="submit">进入工作台</button>
+          <p id="login-error" class="form-error" role="alert"></p>
+        </form>
+      </section>
+    </main>
+
+    <div id="app-view" class="app-shell" hidden>
+      <aside class="sidebar">
+        <div class="brand-lockup brand-lockup-light">
+          <span class="brand-mark" aria-hidden="true">言</span>
+          <div>
+            <strong>言权</strong>
+            <span>售后协同台</span>
+          </div>
+        </div>
+        <nav class="side-nav" aria-label="工作台导航">
+          <button class="nav-item nav-item-active" type="button">
+            <span class="nav-dot"></span>
+            案件工作台
+          </button>
+        </nav>
+        <div class="sidebar-note">
+          <span>当前身份</span>
+          <strong id="current-role">客服</strong>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Operations</p>
+            <h1>案件工作台</h1>
+          </div>
+          <div class="account">
+            <span id="account-name"></span>
+            <button id="logout" class="button button-quiet" type="button">退出</button>
+          </div>
+        </header>
+
+        <section class="queue" aria-labelledby="queue-title">
+          <div class="queue-head">
+            <div>
+              <p id="queue-summary" class="queue-summary">正在读取案件</p>
+              <h2 id="queue-title">待办队列</h2>
+            </div>
+            <button id="refresh" class="button button-secondary" type="button">刷新</button>
+          </div>
+
+          <form id="filters" class="filters" aria-label="案件筛选">
+            <label class="search-field">
+              <span class="sr-only">搜索案件</span>
+              <input id="search" type="search" placeholder="搜索原始描述" />
+            </label>
+            <label>
+              <span class="sr-only">案件状态</span>
+              <select id="status-filter">
+                <option value="all">全部状态</option>
+                <option value="pending_assignment">待认领</option>
+                <option value="in_progress">处理中</option>
+                <option value="waiting_user">待用户补充</option>
+                <option value="resolved">已解决</option>
+                <option value="closed">已关闭</option>
+              </select>
+            </label>
+            <button class="button button-primary" type="submit">筛选</button>
+          </form>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>案件</th>
+                  <th>类别</th>
+                  <th>案件状态</th>
+                  <th>负责人</th>
+                  <th>创建时间</th>
+                </tr>
+              </thead>
+              <tbody id="case-rows"></tbody>
+            </table>
+          </div>
+          <div id="empty-state" class="empty-state" hidden>
+            <strong>没有匹配案件</strong>
+            <span>调整筛选条件后再试。</span>
+          </div>
+          <div class="pager">
+            <button id="prev-page" class="button button-quiet" type="button">上一页</button>
+            <span id="page-label">第 1 页</span>
+            <button id="next-page" class="button button-quiet" type="button">下一页</button>
+          </div>
+        </section>
+      </section>
+
+      <div id="drawer-overlay" class="drawer-overlay" hidden></div>
+      <aside id="case-drawer" class="case-drawer" aria-labelledby="case-title" hidden>
+        <header class="drawer-head">
+          <div>
+            <p id="case-kicker" class="eyebrow"></p>
+            <h2 id="case-title">案件详情</h2>
+          </div>
+          <button id="close-drawer" class="button button-quiet" type="button" aria-label="关闭详情">关闭</button>
+        </header>
+        <div id="case-detail" class="drawer-body"></div>
+      </aside>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

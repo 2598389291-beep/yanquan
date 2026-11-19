@@ -2,6 +2,7 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from typing import Optional
 
@@ -69,6 +70,11 @@ app.include_router(operations.router)
 import os as _os
 _os.makedirs(settings.upload_dir, exist_ok=True)
 app.mount("/files", StaticFiles(directory=settings.upload_dir), name="files")
+app.mount(
+    "/ops",
+    StaticFiles(directory=Path(__file__).parent / "static" / "ops", html=True),
+    name="ops",
+)
 
 
 # ---------- 统一错误处理 ----------
@@ -98,6 +104,7 @@ def root():
         "name": "言权 · AI 消费者维权助手",
         "version": APP_VERSION,
         "docs": "/docs",
+        "ops": "/ops/",
         "mode": "demo" if settings.demo_mode else "llm",
         "message": "口述即出信，维权有依据",
     }

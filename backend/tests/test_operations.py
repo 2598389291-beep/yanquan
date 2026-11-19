@@ -34,6 +34,27 @@ def test_login_exposes_consumer_role(client):
     assert resp.json()["data"]["role"] == "consumer"
 
 
+def test_configured_admin_login_exposes_admin_role(client, monkeypatch):
+    from backend.config import settings
+
+    user = _create_user("13800000019")
+    monkeypatch.setattr(settings, "admin_user_id", str(user["id"]))
+    resp = client.post(
+        "/api/auth/email/login",
+        json={"email": "admin-role@test.com", "password": "secret123"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["role"] == "consumer"
+
+    client.post("/api/auth/send-code", json={"phone": "13800000019"})
+    login = client.post(
+        "/api/auth/verify",
+        json={"phone": "13800000019", "code": "123456"},
+    )
+    assert login.status_code == 200
+    assert login.json()["data"]["role"] == "admin"
+
+
 def test_operations_requires_staff_role(client):
     consumer = _create_user("13800000001")
     assert client.get("/api/operations/cases").status_code == 401
@@ -62,6 +83,17 @@ def test_admin_can_promote_user_to_agent(client):
     assert client.get("/api/operations/cases", headers=_headers(consumer)).status_code == 200
 
 
+def test_configured_admin_appears_in_assignment_list(client, monkeypatch):
+    from backend.config import settings
+
+    admin = _create_user("13800000022")
+    monkeypatch.setattr(settings, "admin_user_id", str(admin["id"]))
+    resp = client.get("/api/operations/agents", headers=_headers(admin))
+    assert resp.status_code == 200
+    items = resp.json()["data"]["items"]
+    assert any(item["id"] == admin["id"] and item["role"] == "admin" for item in items)
+
+
 def test_admin_assigns_case_and_agent_sees_only_own_queue(client):
     consumer = _create_user("13800000002")
     admin = _create_user("13800000003", "admin")
@@ -81,6 +113,7 @@ def test_admin_assigns_case_and_agent_sees_only_own_queue(client):
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["assignee_id"] == str(agent["id"])
+    assert data["assignee_name"] == agent["phone"]
     assert data["case_status"] == "in_progress"
     assert data["events"][-1]["action"] == "assigned"
 
@@ -165,6 +198,7 @@ def test_user_progress_only_visible_to_owner(client):
     )
     assert resp.status_code == 200
     assert resp.json()["data"]["case_status"] == "in_progress"
+    assert resp.json()["data"]["assignee_name"] == "客服人员"
     assert resp.json()["data"]["events"][0]["label"] == "客服已认领"
 
     denied = client.get(

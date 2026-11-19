@@ -620,6 +620,11 @@ async def complaint_progress(
         "assigned": "案件已分派",
         "status_changed": "处理进度已更新",
     }
+    assignee_name = (
+        case.get("assignee_nickname") or "客服人员"
+        if case.get("assignee_id")
+        else ""
+    )
     return {
         "code": 0,
         "data": {
@@ -628,7 +633,7 @@ async def complaint_progress(
             "case_status_label": CASE_STATUS_LABELS.get(
                 case["case_status"], case["case_status"]
             ),
-            "assignee_nickname": case.get("assignee_nickname") or "",
+            "assignee_name": assignee_name,
             "events": [
                 {
                     "action": event["action"],

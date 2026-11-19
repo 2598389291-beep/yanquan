@@ -15,6 +15,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from ..authz import effective_role
 from ..config import settings
 from ..database import create_or_update_user, get_user_by_email, get_user_by_phone
 
@@ -128,7 +129,7 @@ def _login_response(user: dict) -> dict:
             "user_id": user["id"],
             "nickname": user.get("nickname", ""),
             "avatar": user.get("avatar", ""),
-            "role": user.get("role") or "consumer",
+            "role": effective_role(user),
             "expires_at": user.get("token_expires_at", ""),
         },
     }

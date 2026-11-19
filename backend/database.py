@@ -406,7 +406,8 @@ def update_complaint_status(complaint_id: int, user_id: str, new_status: str) ->
 
 def _get_case_row(cursor: sqlite3.Cursor, complaint_id: int) -> Optional[sqlite3.Row]:
     cursor.execute(
-        "SELECT c.*, u.nickname AS assignee_nickname, u.role AS assignee_role "
+        "SELECT c.*, u.nickname AS assignee_nickname, u.email AS assignee_email, "
+        "u.phone AS assignee_phone, u.role AS assignee_role "
         "FROM complaints c "
         "LEFT JOIN users u ON CAST(u.id AS TEXT) = c.assignee_id "
         "WHERE c.id = ?",
@@ -508,7 +509,8 @@ def list_cases(
     cursor.execute(
         "SELECT c.id, c.category, c.raw_text, c.status, c.case_status, "
         "c.assignee_id, c.created_at, c.claimed_at, "
-        "u.nickname AS assignee_nickname "
+        "u.nickname AS assignee_nickname, u.email AS assignee_email, "
+        "u.phone AS assignee_phone "
         "FROM complaints c "
         "LEFT JOIN users u ON CAST(u.id AS TEXT) = c.assignee_id "
         f"WHERE {where_sql} ORDER BY c.created_at DESC, c.id DESC LIMIT ? OFFSET ?",
@@ -525,8 +527,21 @@ def list_cases(
         item["case_status_label"] = CASE_STATUS_LABELS.get(
             item.get("case_status", ""), item.get("case_status", "")
         )
+        item["assignee_name"] = _case_assignee_name(item)
         items.append(item)
     return items, total
+
+
+def _case_assignee_name(case: dict) -> str:
+    assignee_id = case.get("assignee_id") or ""
+    if not assignee_id:
+        return "未分配"
+    return (
+        case.get("assignee_nickname")
+        or case.get("assignee_email")
+        or case.get("assignee_phone")
+        or f"账号 {assignee_id}"
+    )
 
 
 def claim_case(complaint_id: int, actor_id: str) -> Optional[dict]:
@@ -806,7 +821,23 @@ def list_agents() -> list:
         "WHERE role IN ('agent', 'admin') ORDER BY role DESC, id ASC"
     ).fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    items = [dict(row) for row in rows]
+    if settings.admin_user_id and not any(
+        str(item["id"]) == settings.admin_user_id for item in items
+    ):
+        admin = get_user_by_id(settings.admin_user_id)
+        if admin:
+            items.insert(
+                0,
+                {
+                    "id": admin["id"],
+                    "nickname": admin.get("nickname", ""),
+                    "email": admin.get("email", ""),
+                    "phone": admin.get("phone", ""),
+                    "role": "admin",
+                },
+            )
+    return items
 
 
 # ---------- 用户反馈 ----------
