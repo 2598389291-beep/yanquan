@@ -8,6 +8,7 @@ backend/.env.*
 
 # ===== 微信开发者工具认证（绝不提交） =====
 miniapp/.auth/
+miniapp/project.private.config.json
 
 # ===== 数据库与本地数据 =====
 *.db
