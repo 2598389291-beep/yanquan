@@ -291,6 +291,10 @@ function renderDrawer() {
   const events = Array.isArray(item.events) ? item.events : [];
   const triage = item.triage || {};
   const triageSignals = Array.isArray(triage.signals) ? triage.signals : [];
+  const suggestion = item.reply_suggestion || {};
+  const suggestionCitations = Array.isArray(suggestion.citations) ? suggestion.citations : [];
+  const suggestionActions = Array.isArray(suggestion.next_actions) ? suggestion.next_actions : [];
+  const suggestionRisks = Array.isArray(suggestion.risk_flags) ? suggestion.risk_flags : [];
   const transitionButtons = (transitions[item.case_status] || [])
     .filter((next) => !(next === "in_progress" && item.case_status === "pending_assignment"))
     .map(
@@ -393,6 +397,21 @@ function renderDrawer() {
     </section>
 
     <section class="detail-section">
+      <h3>客服回复建议</h3>
+      ${
+        suggestion.reply
+          ? `<p>${escapeHtml(suggestion.reply)}</p>
+             <div class="tag-list">${suggestionCitations.map((citation) => `<a class="tag" href="${escapeHtml(citation.source_url || "#")}" target="_blank" rel="noreferrer">《${escapeHtml(citation.law_name)}》${escapeHtml(citation.article)}</a>`).join("")}</div>
+             ${suggestionActions.length ? `<h4>下一步</h4><ul class="plain-list">${suggestionActions.map((action) => `<li>${escapeHtml(action)}</li>`).join("")}</ul>` : ""}
+             ${suggestionRisks.length ? `<h4>风险提示</h4><div class="tag-list">${suggestionRisks.map((risk) => `<span class="tag tag-risk">${escapeHtml(risk)}</span>`).join("")}</div>` : ""}`
+          : '<p class="muted">尚未生成客服回复建议。</p>'
+      }
+      <div class="action-row triage-actions">
+        <button id="suggest-reply" class="button button-secondary" type="button">${suggestion.reply ? "重新生成建议" : "生成回复建议"}</button>
+      </div>
+    </section>
+
+    <section class="detail-section">
       <h3>法条依据</h3>
       <div class="tag-list">
         ${legalBasis.length ? legalBasis.map((law) => `<span class="tag">${escapeHtml(law)}</span>`).join("") : '<span class="muted">暂无</span>'}
@@ -434,6 +453,7 @@ function renderDrawer() {
 
   $("#claim-case")?.addEventListener("click", claimCase);
   $("#retriage-case")?.addEventListener("click", retriageCase);
+  $("#suggest-reply")?.addEventListener("click", generateSuggestion);
   $("#assign-form")?.addEventListener("submit", assignCase);
   $("#case-detail")
     .querySelectorAll("[data-status]")
@@ -445,6 +465,9 @@ function eventLabel(event) {
   if (event.action === "assigned") return "管理员分派案件";
   if (event.action === "triaged") {
     return `智能分诊：${event.detail?.category || ""} · ${priorityMap[event.detail?.priority]?.label || event.detail?.priority || ""}`;
+  }
+  if (event.action === "suggestion_generated") {
+    return `生成客服回复建议 · 引用 ${event.detail?.citation_count || 0} 条`;
   }
   if (event.action === "status_changed") {
     const from = statusMap[event.from_case_status]?.label || event.from_case_status;
@@ -518,6 +541,15 @@ function retriageCase() {
     `/api/operations/cases/${state.selectedCase.id}/triage`,
     null,
     "智能分诊已更新"
+  );
+}
+
+function generateSuggestion() {
+  if (!state.selectedCase) return;
+  mutateCase(
+    `/api/operations/cases/${state.selectedCase.id}/suggestion`,
+    null,
+    "客服回复建议已生成"
   );
 }
 

@@ -19,11 +19,13 @@ from ..database import (
     get_user_by_id,
     list_agents,
     list_cases,
+    save_case_suggestion,
     set_user_role,
     transition_case,
     update_case_triage,
 )
 from ..services.triage import triage_case
+from ..services.reply_suggestion import build_reply_suggestion
 
 router = APIRouter(prefix="/api/operations", tags=["客服运营"])
 
@@ -82,6 +84,14 @@ def _serialize_case(case: dict, include_letter: bool = False) -> dict:
             "signals": _json_value(case.get("triage_signals"), []),
             "source": case.get("triage_source") or "",
             "triaged_at": case.get("triage_at") or "",
+        },
+        "reply_suggestion": {
+            "reply": case.get("suggestion_text") or "",
+            "citations": _json_value(case.get("suggestion_citations"), []),
+            "next_actions": _json_value(case.get("suggestion_next_actions"), []),
+            "risk_flags": _json_value(case.get("suggestion_risk_flags"), []),
+            "source": case.get("suggestion_source") or "",
+            "generated_at": case.get("suggestion_generated_at") or "",
         },
         "events": case.get("events") or [],
     }
@@ -235,6 +245,25 @@ async def triage_operations_case(
         evidence=evidence,
     )
     case = update_case_triage(complaint_id, str(actor["id"]), triage)
+    return {"code": 0, "data": _serialize_case(case, include_letter=True)}
+
+
+@router.post("/cases/{complaint_id}/suggestion")
+async def suggest_operations_reply(
+    complaint_id: int,
+    actor: dict = Depends(require_roles("agent", "admin")),
+):
+    existing = get_case_by_id(complaint_id)
+    if not existing:
+        return _error(404, "案件不存在")
+    if not _can_view_case(existing, actor):
+        return _error(403, "无权操作其他客服的案件")
+    suggestion = build_reply_suggestion(
+        existing.get("raw_text", ""),
+        category=existing.get("triage_category") or existing.get("category", ""),
+        evidence=_json_value(existing.get("evidence"), []),
+    )
+    case = save_case_suggestion(complaint_id, str(actor["id"]), suggestion)
     return {"code": 0, "data": _serialize_case(case, include_letter=True)}
 
 

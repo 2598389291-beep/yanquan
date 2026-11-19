@@ -109,5 +109,8 @@ def test_rbac_and_operations_schema_exists():
         "triage_priority",
         "triage_team",
         "triage_confidence",
+        "suggestion_text",
+        "suggestion_citations",
+        "suggestion_generated_at",
     }.issubset(complaint_cols)
     assert event_table is not None

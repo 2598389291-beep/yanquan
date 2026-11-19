@@ -14,10 +14,10 @@ def _headers(user: dict) -> dict:
     return {"Authorization": f"Bearer {user['token']}"}
 
 
-def _create_case(user_id: str) -> dict:
+def _create_case(user_id: str, raw_text: str = "商家拒绝退款，要求平台介入处理") -> dict:
     return db.save_complaint(
         user_id=user_id,
-        raw_text="商家拒绝退款，要求平台介入处理",
+        raw_text=raw_text,
         complaint_letter="投诉信正文",
         legal_basis=["消费者权益保护法-39"],
         action_path=["联系平台"],
@@ -76,6 +76,26 @@ def test_operations_can_retriage_case_and_log_event(client):
         headers=_headers(agent),
     )
     assert high_cases.json()["data"]["total"] == 1
+
+
+def test_operations_can_generate_reply_suggestion(client):
+    consumer = _create_user("13800000027")
+    agent = _create_user("13800000028", "agent")
+    case = _create_case(
+        str(consumer["id"]),
+        raw_text="外卖里吃到蟑螂，商家只肯退餐费，我要赔偿医药费",
+    )
+
+    resp = client.post(
+        f"/api/operations/cases/{case['id']}/suggestion",
+        headers=_headers(agent),
+    )
+    assert resp.status_code == 200
+    suggestion = resp.json()["data"]["reply_suggestion"]
+    assert suggestion["reply"]
+    assert suggestion["citations"]
+    assert suggestion["source"] == "template"
+    assert resp.json()["data"]["events"][-1]["action"] == "suggestion_generated"
 
 
 def test_login_exposes_consumer_role(client):

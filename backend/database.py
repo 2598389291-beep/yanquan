@@ -80,6 +80,12 @@ def init_db():
             triage_signals TEXT DEFAULT '[]',
             triage_source TEXT DEFAULT '',
             triage_at TIMESTAMP,
+            suggestion_text TEXT DEFAULT '',
+            suggestion_citations TEXT DEFAULT '[]',
+            suggestion_next_actions TEXT DEFAULT '[]',
+            suggestion_risk_flags TEXT DEFAULT '[]',
+            suggestion_source TEXT DEFAULT '',
+            suggestion_generated_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT (datetime('now','localtime'))
         );
 
@@ -149,6 +155,12 @@ def _migrate(conn: sqlite3.Connection):
         ("triage_signals", "TEXT DEFAULT '[]'"),
         ("triage_source", "TEXT DEFAULT ''"),
         ("triage_at", "TIMESTAMP"),
+        ("suggestion_text", "TEXT DEFAULT ''"),
+        ("suggestion_citations", "TEXT DEFAULT '[]'"),
+        ("suggestion_next_actions", "TEXT DEFAULT '[]'"),
+        ("suggestion_risk_flags", "TEXT DEFAULT '[]'"),
+        ("suggestion_source", "TEXT DEFAULT ''"),
+        ("suggestion_generated_at", "TIMESTAMP"),
     ):
         if column not in cols:
             conn.execute(f"ALTER TABLE complaints ADD COLUMN {column} {definition}")
@@ -812,6 +824,48 @@ def update_case_triage(complaint_id: int, actor_id: str, triage: dict) -> Option
             "team": triage.get("team", ""),
             "confidence": triage.get("confidence"),
             "source": triage.get("source", ""),
+        },
+    )
+    conn.commit()
+    conn.close()
+    return get_case_by_id(complaint_id)
+
+
+def save_case_suggestion(complaint_id: int, actor_id: str, suggestion: dict) -> Optional[dict]:
+    """保存客服回复建议并记录操作日志。"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    row = _get_case_row(cursor, complaint_id)
+    if not row:
+        conn.rollback()
+        conn.close()
+        return None
+    cursor.execute(
+        "UPDATE complaints SET suggestion_text = ?, suggestion_citations = ?, "
+        "suggestion_next_actions = ?, suggestion_risk_flags = ?, "
+        "suggestion_source = ?, suggestion_generated_at = datetime('now','localtime') "
+        "WHERE id = ?",
+        (
+            suggestion.get("reply", ""),
+            json.dumps(suggestion.get("citations", []), ensure_ascii=False),
+            json.dumps(suggestion.get("next_actions", []), ensure_ascii=False),
+            json.dumps(suggestion.get("risk_flags", []), ensure_ascii=False),
+            suggestion.get("source", ""),
+            complaint_id,
+        ),
+    )
+    _append_case_event(
+        cursor,
+        complaint_id,
+        actor_id,
+        "suggestion_generated",
+        from_case_status=row["case_status"],
+        to_case_status=row["case_status"],
+        assignee_id=row["assignee_id"] or "",
+        detail={
+            "citation_count": len(suggestion.get("citations", [])),
+            "source": suggestion.get("source", ""),
         },
     )
     conn.commit()
